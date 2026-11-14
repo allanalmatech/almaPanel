@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=root
 Group=almapanel
+EnvironmentFile=-/etc/almapanel/agent.env
 WorkingDirectory=/opt/almapanel
 ExecStart=/usr/bin/python3 -m agent.server
 RuntimeDirectory=almapanel

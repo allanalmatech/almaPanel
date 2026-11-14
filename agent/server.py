@@ -14,12 +14,18 @@ import socketserver
 import struct
 import subprocess
 import tempfile
+import sys
 from backend.core import name,domain,Problem
 
 BASE=Path('/srv/almapanel/accounts')
 REGISTRY=Path('/var/lib/almapanel-agent/registry.json')
 ROOT=Path(__file__).resolve().parents[1]
-SERVICES={'nginx','php8.3-fpm'}
+PHP_UNIT = os.environ.get('ALMA_PHP_UNIT', 'php8.3-fpm')
+PHP_BIN = os.environ.get('ALMA_PHP_BIN', '/usr/sbin/php-fpm8.3')
+PHP_POOL = Path(os.environ.get('ALMA_PHP_POOL', '/etc/php/8.3/fpm/pool.d'))
+PHP_RUN = os.environ.get('ALMA_PHP_RUN', '/run/php')
+WEB_USER = os.environ.get('ALMA_WEB_USER', 'www-data')
+SERVICES = {'nginx', PHP_UNIT}
 
 def run(argv,**kw):
     return subprocess.run(argv,check=True,capture_output=True,text=True,timeout=120,
@@ -57,7 +63,7 @@ def vhost(account,host,suspended=False):
   try_files $uri =404;
   include fastcgi_params;
   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-  fastcgi_pass unix:/run/php/alma-{account}.sock;
+  fastcgi_pass unix:{PHP_RUN}/alma-{account}.sock;
  }}
 }}
 """
@@ -67,9 +73,9 @@ def php_pool(account):
     return f"""[alma-{account}]
 user = ap_{account}
 group = ap_{account}
-listen = /run/php/alma-{account}.sock
-listen.owner = www-data
-listen.group = www-data
+listen = {PHP_RUN}/alma-{account}.sock
+listen.owner = {WEB_USER}
+listen.group = {WEB_USER}
 listen.mode = 0600
 pm = ondemand
 pm.max_children = 2
@@ -123,9 +129,9 @@ def account_create(account):
         for child in ('public_html','runtime'):
             path=home/child;path.mkdir(mode=0o750);os.chown(path,p.pw_uid,p.pw_gid)
         # Grant only the web-server read/traverse ACL; other tenants have no access.
-        run(['/usr/bin/setfacl','-m','u:www-data:--x',str(home)])
-        run(['/usr/bin/setfacl','-m','u:www-data:r-x,d:u:www-data:r-x',str(home/'public_html')])
-        configs({Path(f'/etc/php/8.3/fpm/pool.d/alma-{account}.conf'):php_pool(account)},'php8.3-fpm',['/usr/sbin/php-fpm8.3','-t'])
+        run(['/usr/bin/setfacl','-m',f'u:{WEB_USER}:--x',str(home)])
+        run(['/usr/bin/setfacl','-m',f'u:{WEB_USER}:r-x,d:u:{WEB_USER}:r-x',str(home/'public_html')])
+        configs({PHP_POOL / f'alma-{account}.conf':php_pool(account)},PHP_UNIT,[PHP_BIN,'-t'])
         data[account]['state']='active';save(data)
         return {'message':'Linux account and PHP-FPM pool provisioned.'}
     except Exception:
@@ -145,7 +151,7 @@ def dispatch(operation,args):
     if operation=='service.restart':
         if args.get('service') not in SERVICES: raise ValueError('Service not allowed.')
         service=args['service']
-        run(['/usr/sbin/nginx','-t'] if service=='nginx' else ['/usr/sbin/php-fpm8.3','-t'])
+        run(['/usr/sbin/nginx','-t'] if service=='nginx' else [PHP_BIN,'-t'])
         run(['/usr/bin/systemctl','restart',service]);return {'message':'Service restarted.'}
     account=name(args.get('name'))
     if operation=='account.create': return account_create(account)
@@ -175,7 +181,7 @@ def dispatch(operation,args):
     home=BASE/account/'public_html'
     if operation=='files':
         request=args.get('request',{})
-        child=subprocess.run(['/usr/bin/python3','-I',str(ROOT/'agent/files.py'),str(home)],
+        child=subprocess.run([sys.executable,'-I',str(ROOT/'agent/files.py'),str(home)],
                input=json.dumps(request),capture_output=True,text=True,timeout=30,
                user=p.pw_uid,group=p.pw_gid,extra_groups=[],umask=0o027,cwd=home,
                env={'PATH':'/usr/bin:/bin','HOME':str(BASE/account),'LANG':'C.UTF-8'})

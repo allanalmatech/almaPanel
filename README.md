@@ -6,6 +6,8 @@ Linux hosting control panel with an original, compact, grouped-tool interface in
 
 > **0.1.0-alpha.1 — evaluation only. This is NOT the complete cPanel-equivalent system or a production-certified release.** The source implements a working control-plane core and real Linux operation adapters; EC2/systemd installation has not been executed in this build environment. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) before installation. Unimplemented modules are explicitly listed, never simulated.
 
+Amazon Linux 2023 is also an evaluation target. See [Amazon Linux 2023 EC2 evaluation](DEPLOYMENT.md#amazon-linux-2023-ec2-evaluation).
+
 ## Start on a clean Ubuntu EC2 instance
 Target: **Ubuntu Server 24.04 LTS**, amd64 or arm64. Minimum approximately 1 GiB RAM and 5 GiB free disk; 2 GiB RAM recommended. Start with one small PHP/static site. The included CloudFormation example targets amd64. No claim of free AWS usage is made.
 

@@ -2,7 +2,7 @@
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
 ## Supported target versus verified environment
-The installer accepts Ubuntu Server **24.04 LTS** on amd64/aarch64 only. These are implementation targets, **not certified supported platforms**: live VM acceptance is pending on both architectures. The local build/test environment uses Python 3.12 but is not a systemd VM. Ubuntu 22.04, Ubuntu 26.04, Debian, AlmaLinux and Rocky are rejected intentionally.
+The installer targets Ubuntu Server **24.04 LTS** and Amazon Linux **2023** on x86_64 and aarch64. Live VM acceptance is pending. Other distributions and versions are rejected by preflight.
 
 Minimum: approximately 1 GiB RAM, 5 GiB available disk, root access, systemd, working DNS and outbound HTTPS/APT access. Use a 12–20 GiB encrypted EBS volume and 2 GiB RAM if available in your budget. One small PHP site may fit 1 GiB; concurrency and workloads determine actual capacity. No automatic swap allocation or guaranteed account density.
 
@@ -91,3 +91,29 @@ The bootstrap refuses a missing/invalid archive digest and verifies downloaded b
 - Waitress proxy trust: https://docs.pylonsproject.org/projects/waitress/en/stable/reverse-proxy.html
 
 AWS Free Tier benefits depend on account creation date and usage. EC2 blocks outbound public port 25 by default, so a future mail module needs appropriate infrastructure/approval or an authenticated relay. These are not bypassed by installing almaPanel.
+
+## Amazon Linux 2023 EC2 evaluation
+
+The installer automatically selects the Amazon Linux 2023 adapter on x86_64 and
+aarch64. The adapter uses the configured DNF repositories, PHP 8.3, Nginx and
+a dedicated Python 3.12 environment with a checksum-pinned Waitress wheel from
+PyPI. It does not change the system Python or upgrade the host release.
+Outbound package repository and PyPI access are required.
+
+Run from a fresh or updated checkout on a clean EC2 instance:
+
+```bash
+sudo bash installer/install.sh --preflight
+sudo bash installer/install.sh --accept-alpha
+```
+
+Use the EC2 account for the default loopback-only panel:
+
+```bash
+ssh -i /path/to/your-key.pem -L 8443:127.0.0.1:8443 ec2-user@YOUR_EC2_IP
+```
+
+Open https://localhost:8443 and follow the administrator setup instructions
+above. This adapter is an evaluation target pending a full EC2 install and reboot
+test. Enforcing SELinux requires a policy that is outside this adapter's scope.
+The installer leaves host SELinux settings intact.

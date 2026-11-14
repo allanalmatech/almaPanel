@@ -17,8 +17,10 @@ while (($#)); do
 done
 fail(){ echo "ERROR: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || fail 'Run as root.'
-source /etc/os-release
-[[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || fail 'Only Ubuntu 24.04 LTS is targeted. No other distribution adapter is validated.'
+source "$ROOT/installer/platform.sh"
+if [[ $ID == amzn && -x /usr/sbin/getenforce ]] && [[ $(/usr/sbin/getenforce) == Enforcing ]]; then
+ fail 'SELinux enforcing support is pending. This installer will not change the host policy.'
+fi
 case "$(uname -m)" in x86_64|aarch64) ;; *) fail 'Only amd64 and arm64 are targeted.';; esac
 [[ $(ps -p 1 -o comm=) == systemd ]] || fail 'A full systemd VM is required, not an application container.'
 [[ $HOST == localhost || $HOST =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] || fail 'Invalid hostname.'
@@ -30,15 +32,20 @@ for path in /opt/almapanel /etc/almapanel /var/lib/almapanel /var/lib/almapanel-
  [[ ! -e $path ]] || fail "Existing state at $path. Use diagnostics and documented recovery; installation refuses overwrite."
 done
 ! getent passwd almapanel >/dev/null || fail 'almapanel system user already exists.'
-for service in nginx apache2 mysql mariadb postgresql postfix dovecot named bind9 php8.3-fpm; do
+for service in nginx apache2 httpd mysql mysqld mariadb postgresql postfix dovecot named bind9 php8.3-fpm php-fpm; do
  if systemctl cat "$service.service" >/dev/null 2>&1; then fail "Existing service $service detected. Use a clean VM; migration is not automated."; fi
 done
 for port in 80 443 8443 9080; do
  if ss -H -ltn "sport = :$port" | read -r _; then fail "TCP port $port is occupied."; fi
 done
-getent ahosts archive.ubuntu.com >/dev/null || fail 'DNS resolution failed.'
+if [[ $ID == ubuntu ]]; then
+ getent ahosts archive.ubuntu.com >/dev/null || fail 'Ubuntu repository DNS resolution failed.'
+else
+ dnf -q list php8.3-fpm nginx python3.12 python3.12-pip >/dev/null || fail 'Required packages are unavailable in the configured Amazon Linux repositories.'
+ getent ahosts pypi.org >/dev/null || fail 'PyPI DNS resolution failed.'
+fi
 if (( PREFLIGHT )); then
- echo 'Local preflight passed. No changes made. APT connectivity, TLS and service execution remain to be tested.'
+ echo 'Local preflight passed. No changes made. Package installation, TLS and service execution remain to be tested.'
  exit 0
 fi
 if (( ! ACCEPT )); then
@@ -52,11 +59,14 @@ exec > >(tee -a /var/log/almapanel/install.log) 2>&1
 trap 'rc=$?; echo "Installation failed (exit $rc, line $LINENO). Preserve /var/log/almapanel/install.log. Do not rerun blindly. See docs/TROUBLESHOOTING.md."; exit "$rc"' ERR
 exec 9>/run/almapanel-install.lock
 flock -n 9 || fail 'Another installer is running.'
-echo '[1/7] Installing Ubuntu repository packages'
-export DEBIAN_FRONTEND=noninteractive
-apt-get -o Acquire::Retries=3 update
-apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3 python3-waitress nginx php8.3-fpm php8.3-cli acl openssl curl ca-certificates rsync git
-# No third-party PPAs, application downloads, default passwords, or firewall resets.
+echo '[1/7] Installing platform packages'
+if [[ $ID == ubuntu ]]; then
+ export DEBIAN_FRONTEND=noninteractive
+ apt-get -o Acquire::Retries=3 update
+ apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3 python3-waitress nginx php8.3-fpm php8.3-cli acl openssl curl ca-certificates rsync git
+else
+ dnf install -y python3.12 python3.12-pip nginx php8.3-fpm php8.3-cli acl openssl ca-certificates rsync git
+fi
 echo '[2/7] Creating dedicated control-plane identity'
 useradd --system --user-group --home-dir /var/lib/almapanel --shell /usr/sbin/nologin almapanel
 install -d -m 700 -o almapanel -g almapanel /var/lib/almapanel
@@ -66,33 +76,55 @@ install -d -m 755 /opt/almapanel
 rsync -a --exclude=.git --exclude=__pycache__ --exclude=dist --exclude=.coverage --exclude='*.pyc' "$ROOT/" /opt/almapanel/
 chown -R root:root /opt/almapanel
 chmod -R go-w /opt/almapanel
+if [[ $ID == amzn ]]; then
+ /usr/bin/python3.12 -m venv /opt/almapanel/venv
+ "$PANEL_PY" -m pip --isolated install --index-url https://pypi.org/simple --disable-pip-version-check --only-binary=:all: --require-hashes -r /opt/almapanel/installer/requirements-al2023.txt
+fi
 echo '[3/7] Initializing panel database and one-time setup token'
-runuser -u almapanel -- env PYTHONPATH=/opt/almapanel /usr/bin/python3 -c 'from backend.core import initialize; initialize()'
+runuser -u almapanel -- env PYTHONPATH=/opt/almapanel "$PANEL_PY" -c 'from backend.core import initialize; initialize()'
 if (( PUBLIC )); then BIND=0.0.0.0; ORIGIN="https://$HOST:8443"; else BIND=127.0.0.1; ORIGIN=https://localhost:8443; fi
 printf 'ALMA_ORIGIN=%s\nALMA_STATE=/var/lib/almapanel\n' "$ORIGIN" > /etc/almapanel/panel.env
-chmod 600 /etc/almapanel/panel.env
+printf 'ALMA_PHP_UNIT=%s\nALMA_PHP_BIN=%s\nALMA_PHP_POOL=%s\nALMA_PHP_RUN=%s\nALMA_WEB_USER=%s\n' \
+ "$PHP_UNIT" "$PHP_BIN" "$PHP_POOL" "$PHP_RUN" "$WEB_USER" > /etc/almapanel/agent.env
+chmod 600 /etc/almapanel/panel.env /etc/almapanel/agent.env
 echo '[4/7] Creating local TLS certificate'
 openssl req -x509 -newkey rsa:3072 -sha256 -days 30 -nodes -keyout /etc/almapanel/panel.key -out /etc/almapanel/panel.crt -subj "/CN=$HOST" -addext "subjectAltName=DNS:$HOST,DNS:localhost,IP:127.0.0.1" >/dev/null 2>&1
 chmod 600 /etc/almapanel/panel.key
 sed -e "s/@BIND@/$BIND/g" -e "s/@HOST@/$HOST/g" /opt/almapanel/services/nginx/panel.conf > /etc/nginx/conf.d/almapanel.conf
 # Only the default site installed in this transaction is removed.
-rm -f /etc/nginx/sites-enabled/default
+if [[ $ID == ubuntu ]]; then
+ rm -f /etc/nginx/sites-enabled/default
+else
+ cp -p /etc/nginx/nginx.conf /etc/almapanel/package-nginx.conf
+ install -m 644 /opt/almapanel/services/nginx/amazon-linux.conf /etc/nginx/nginx.conf
+ install -d -m 755 /etc/systemd/system/php-fpm.service.d
+ printf '[Service]\nRuntimeDirectory=php-fpm\n' > /etc/systemd/system/php-fpm.service.d/almapanel.conf
+fi
 install -m 644 /opt/almapanel/services/nginx/default.conf /etc/nginx/conf.d/almapanel-default.conf
 # Remove package's shared PHP pool; each hosting account gets a private ondemand pool.
-mv /etc/php/8.3/fpm/pool.d/www.conf /etc/almapanel/package-www.conf.disabled
+mv "$PHP_POOL/www.conf" /etc/almapanel/package-www.conf.disabled
 # PHP-FPM requires one pool to start before any hosting accounts exist.
-install -m 644 /opt/almapanel/services/php/idle.conf /etc/php/8.3/fpm/pool.d/alma-idle.conf
+sed -e "s@/run/php/@$PHP_RUN/@g" -e "s/^group = nogroup$/group = $(id -gn nobody)/" \
+ /opt/almapanel/services/php/idle.conf > "$PHP_POOL/alma-idle.conf"
 echo '[5/7] Installing systemd services'
-install -m 644 /opt/almapanel/services/systemd/*.service /etc/systemd/system/
+for unit in /opt/almapanel/services/systemd/*.service; do
+ sed -e "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
+     -e "s/^Group=www-data$/Group=$WEB_USER/" "$unit" > "/etc/systemd/system/${unit##*/}"
+ chmod 644 "/etc/systemd/system/${unit##*/}"
+done
 systemctl daemon-reload
 systemctl enable --now almapanel-agent almapanel-api almapanel-worker
 /usr/sbin/nginx -t
-/usr/sbin/php-fpm8.3 -t
-systemctl enable nginx php8.3-fpm
-systemctl restart php8.3-fpm nginx
+"$PHP_BIN" -t
+systemctl enable nginx "$PHP_UNIT"
+systemctl restart "$PHP_UNIT" nginx
 echo '[6/7] Checking installed service health'
 bash /opt/almapanel/installer/healthcheck.sh
-dpkg-query -W -f='${Package}\t${Version}\n' python3 python3-waitress nginx php8.3-fpm > /etc/almapanel/package-versions.txt
+if [[ $ID == ubuntu ]]; then
+ dpkg-query -W -f='${Package}\t${Version}\n' python3 python3-waitress nginx php8.3-fpm > /etc/almapanel/package-versions.txt
+else
+ rpm -q python3.12 python3.12-pip nginx php8.3-fpm > /etc/almapanel/package-versions.txt
+fi
 echo '[7/7] Installation completed'
 echo "almaPanel URL: $ORIGIN"
 echo "Administrator setup: $ORIGIN (select First installation)"
@@ -102,6 +134,10 @@ echo 'Configuration: /etc/almapanel | Log: /var/log/almapanel + systemd journal'
 echo 'Documentation: /opt/almapanel/docs and /opt/almapanel/DEPLOYMENT.md'
 echo 'Local certificate expires in 30 days. Verify its fingerprint over SSH before trusting it:'
 openssl x509 -in /etc/almapanel/panel.crt -noout -fingerprint -sha256
-if (( ! PUBLIC )); then echo 'Access tunnel: ssh -L 8443:127.0.0.1:8443 ubuntu@YOUR_EC2_IP'; fi
+if (( ! PUBLIC )); then
+ SSH_USER=ubuntu
+ [[ $ID != amzn ]] || SSH_USER=ec2-user
+ echo "Access tunnel: ssh -L 8443:127.0.0.1:8443 $SSH_USER@YOUR_EC2_IP"
+fi
 echo 'Host firewall and AWS security groups were preserved. Configure access explicitly; see DEPLOYMENT.md.'
 echo 'This is an evaluation install. Production release gates remain open.'
