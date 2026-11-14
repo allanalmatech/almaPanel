@@ -5,6 +5,7 @@ from http.cookies import SimpleCookie
 import json
 import logging
 import os
+from pathlib import Path
 import secrets
 import sqlite3
 import time
@@ -173,13 +174,22 @@ def api(env, body, db, headers):
     if path == '/api/system' and method == 'GET':
         admin(user)
         return c.rpc('system.stats')
+    if path == '/api/offsite-backups':
+        admin(user)
+        if method == 'POST':
+            result = c.rpc('backup.offsite.trigger')
+            c.audit(db, user['id'], 'backup.offsite.trigger', 'website backups', ip)
+            return result
+        try:
+            return json.loads(Path('/var/lib/almapanel-backup-status/status.json').read_text())
+        except (OSError, ValueError):
+            return {'state': 'unavailable', 'message': 'Set up the off-site repository or run the first snapshot.'}
     if path == '/api/updates':
         admin(user)
         if method == 'POST':
             result = c.rpc('update.trigger')
             c.audit(db, user['id'], 'update.trigger', 'release channel', ip)
             return result
-        from pathlib import Path
         try:
             status = json.loads(Path('/var/lib/almapanel-update-status/status.json').read_text())
         except (OSError, ValueError):

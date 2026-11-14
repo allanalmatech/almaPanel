@@ -1,0 +1,22 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+[Unit]
+Description=Encrypt and upload almaPanel website backups
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/almapanel/offsite-backup/repository.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /opt/almapanel/installer/offsite_backup.py snapshot
+ExecStopPost=/usr/bin/python3 -I /opt/almapanel/installer/offsite_backup.py record-failure
+TimeoutStartSec=7200
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+Nice=10

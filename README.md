@@ -4,7 +4,7 @@
 
 Linux hosting control panel with an original, compact, grouped-tool interface inspired by familiar hosting workflows.
 
-> **0.1.0-alpha.5 — evaluation.** Includes optional mail hosting alongside database, DNS, site TLS and recovery tools. Full live acceptance remains pending. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the release gates.
+> **0.1.0-alpha.6 — evaluation.** Website Backups can browse, verify and recover individual files. Administrators can configure encrypted off-site website snapshots. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for live acceptance and release gates.
 
 Amazon Linux 2023 is also an evaluation target. See [Amazon Linux 2023 EC2 evaluation](DEPLOYMENT.md#amazon-linux-2023-ec2-evaluation).
 
@@ -47,6 +47,8 @@ services, HTTPS, WordPress, backups, Git staging, PHP settings and account
 security. Available services depend on the host configuration.
 
 Chrooted SFTP and [Postfix/Dovecot email](docs/MAIL.md) are optional services.
+The [backup guide](docs/BACKUPS.md) covers selective restore and encrypted local,
+SFTP and S3-compatible website snapshot repositories.
 Webmail, FTP/WebDAV, interactive tenant SSH, terminal, managed application runtimes,
 enforced OS quotas and full-account backup and migration remain open.
 See [FEATURE_MATRIX.md](FEATURE_MATRIX.md) for partial and completed scope.

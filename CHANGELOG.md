@@ -51,3 +51,11 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
   resets, quotas, archiving and restoration.
 - Add tests for tenant scope, relay denial, TLS authentication, LMTP delivery,
   quota checks and archived mailbox login denial.
+
+## 0.1.0-alpha.6
+
+- Browse and search private website ZIPs, verify their integrity and restore
+  individual files to unused paths.
+- Configure encrypted off-site website snapshots with restic, run backups
+  on demand or daily, track progress and failure in the administrator
+  dashboard, preview retention, and recover and import one site ZIP.

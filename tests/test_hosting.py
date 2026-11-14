@@ -83,6 +83,60 @@ class FileTools(unittest.TestCase):
         self.op('backup_restore', latest, destination='restore')
         self.assertEqual((self.root / 'restore' / 'index.html').read_text(), 'second scheduled version')
 
+    def test_browse_verify_and_restore_file_from_an_existing_website_zip(self):
+        target = self.root / 'docs'
+        target.mkdir()
+        (target / 'page.html').write_text('backup version')
+        (target / 'other.html').write_text('other backed-up file')
+        name = self.op('backup_create')['name']
+        selected = self.op('backup_contents', name, query='PAGE')
+        self.assertEqual(selected['entries'], [{'path': 'docs/page.html', 'size': 14}])
+        self.assertEqual(self.op('backup_verify', name, revision=selected['revision'])['files'], 2)
+        (target / 'page.html').write_text('live version')
+        request = {'member': 'docs/page.html', 'revision': selected['revision']}
+        with self.assertRaises(FileExistsError):
+            self.op('backup_restore_file', name, destination='docs/page.html', **request)
+        self.op('backup_restore_file', name, destination='docs/recovered.html', **request)
+        self.assertEqual((target / 'page.html').read_text(), 'live version')
+        self.assertEqual((target / 'recovered.html').read_text(), 'backup version')
+        self.assertEqual(len(list(target.iterdir())), 3)
+
+    def test_backup_listing_pages_and_rejects_restore_after_archive_replacement(self):
+        name = 'website-0123456789abcdef.zip'
+        archive_path = self.private / 'backups' / name
+        with zipfile.ZipFile(archive_path, 'w') as archive:
+            for index in range(file_tools.BACKUP_PAGE_SIZE + 1):
+                archive.writestr(f'{index:03}.txt', b'original')
+        first = self.op('backup_contents', name)
+        second = self.op('backup_contents', name, offset=first['next_offset'], revision=first['revision'])
+        self.assertEqual(len(first['entries']), file_tools.BACKUP_PAGE_SIZE)
+        self.assertEqual(len(second['entries']), 1)
+        self.assertIsNone(second['next_offset'])
+        with zipfile.ZipFile(archive_path, 'w') as archive:
+            archive.writestr('000.txt', b'changed')
+        with self.assertRaisesRegex(ValueError, 'Backup changed'):
+            self.op('backup_restore_file', name, member='000.txt', destination='recover.txt',
+                    revision=first['revision'])
+        self.assertFalse((self.root / 'recover.txt').exists())
+
+    def test_corrupt_member_and_symlink_destination_leave_no_restore_output(self):
+        name = 'scheduled-0123456789abcdef.zip'
+        archive_path = self.private / 'backups' / name
+        with zipfile.ZipFile(archive_path, 'w') as archive:
+            archive.writestr('page.txt', b'unique-data')
+        (self.root / 'outside').symlink_to(self.private)
+        revision = self.op('backup_contents', name)['revision']
+        with self.assertRaises(OSError):
+            self.op('backup_restore_file', name, destination='outside/page.txt', member='page.txt', revision=revision)
+        self.assertFalse((self.private / 'page.txt').exists())
+        archive_path.write_bytes(archive_path.read_bytes().replace(b'unique-data', b'corrupt-dat'))
+        revision = self.op('backup_contents', name)['revision']
+        with self.assertRaisesRegex(ValueError, 'damaged'):
+            self.op('backup_verify', name, revision=revision)
+        with self.assertRaisesRegex(ValueError, 'damaged'):
+            self.op('backup_restore_file', name, member='page.txt', destination='restore.txt', revision=revision)
+        self.assertEqual([entry.name for entry in self.root.iterdir()], ['outside'])
+
     def test_trash_restore_cannot_overwrite(self):
         path = self.root / 'page.html'
         path.write_text('original')
@@ -207,6 +261,19 @@ class HostingApi(unittest.TestCase):
     login = test_core.API.login
     package = test_core.API.package
     seed_account = test_core.API.seed_account
+
+    def test_offsite_backup_endpoint_requires_administrator(self):
+        self.setup_admin()
+        self.seed_account('hosting', 1, self.package())
+        self.login('hosting')
+        with patch.object(c, 'rpc') as broker:
+            self.assertEqual(self.request('/api/offsite-backups')['status'], 403)
+            self.assertEqual(self.request('/api/offsite-backups', {})['status'], 403)
+            broker.assert_not_called()
+            broker.return_value = {'message': 'Website backup requested.'}
+            self.login('admin')
+            self.assertEqual(self.request('/api/offsite-backups', {})['status'], 200)
+            broker.assert_called_once_with('backup.offsite.trigger')
 
     def login_with_code(self, username, code):
         return self.request('/api/login', {'username':username,'password':'correct horse battery','code':code})

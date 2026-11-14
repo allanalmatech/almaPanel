@@ -214,11 +214,11 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [ ] Full-account backup
 - [ ] Website/database/mail/DNS backup
 - [ ] Scheduled backups
-- [ ] Incremental backups
-- [ ] SFTP/S3 remote storage
-- [ ] Encrypted backup
+- [~] Restic deduplication across website snapshots. Expand to all account resources.
+- [~] SFTP/S3 remote website repository support. Verify each remote backend.
+- [~] Encrypted website backup and recovery. Add DB, mail and DNS coverage.
 - [ ] Retention and integrity policies
-- [ ] Individual-file restore
+- [~] Browse and restore an individual ZIP member. Live EC2 verification pending.
 - [ ] Complete-account restore
 - [ ] Migration between servers
 
@@ -470,3 +470,17 @@ remaining behavior and live acceptance before completion.
 - [x] Add DNS Track for common record queries and a dashboard job inbox.
 - [ ] Run the chroot, upload, authentication and revocation acceptance on EC2.
 - [ ] Add secure interactive shell and browser terminal after isolation review.
+
+## Alpha.6 backup implementation and acceptance
+
+- [x] Browse and search website ZIPs, verify file integrity and selectively
+  restore to unused paths. Local and Chromium checks passed.
+- [x] Implement encrypted website backups through restic, daily scheduling,
+  scoped retention, recovery and import into an active account's private
+  backup list. A local encrypted repository passed a recovery drill.
+- [x] Add administrator controls to request an off-site backup and see
+  the latest run's progress or failure.
+- [ ] Run the installed EC2 backup, daily timer and restore with real tenants
+  and the selected S3 or SFTP provider.
+- [ ] Add database, Maildir, DNS and account configuration to full backups.
+- [ ] Add complete account restore, scheduled failure alerts and migration.

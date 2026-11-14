@@ -63,3 +63,19 @@ LMTP, IMAP quota enforcement, and archived mailbox access. Locally, generated
 configurations and Postfix maps passed parser checks. The Chromium test covers
 form submission using a fixture. Real mail delivery, public DNS and renewal
 need service acceptance on the VM.
+
+## Alpha.6 backup acceptance
+
+```bash
+python3 tests/integration/offsite_backup.py -v
+sudo env ALMA_DISPOSABLE_VM=YES ALMA_TEST_OFFSITE=YES bash tests/installation/amazon_vm.sh
+```
+
+The integration test uses real restic and a temporary local encrypted
+repository. It covers snapshot creation, selective retrieval, imported ZIP
+validation, site recovery, scoped retention and an invalid password. If
+restic is installed outside PATH, set `ALMA_TEST_RESTIC` to its executable.
+Run the second command on a clean Amazon Linux VM with restic available
+from your configured repository or installed at `/usr/local/bin/restic`.
+It adds a round trip with the broker's Linux account identities and the
+installed admin CLI. Test your remote destination and timer separately.

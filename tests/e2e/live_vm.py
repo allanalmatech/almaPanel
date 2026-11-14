@@ -61,6 +61,13 @@ call(account_url + '/files', {'action':'write','path':'next/index.php',
 job(call(account_url + '/domains', {'action':'edit','domain':'acceptance.example.com','root':'next'}))
 assert urllib.request.urlopen(req).read()==b'new-root'
 snapshot = call(account_url + '/files', {'action':'backup_create'})['name']
+archive_contents = call(account_url + '/files', {'action':'backup_contents','path':snapshot,'query':'next/'})
+assert [item['path'] for item in archive_contents['entries']] == ['next/index.php']
+assert call(account_url + '/files', {'action':'backup_verify','path':snapshot})['files'] >= 2
+call(account_url + '/files', {'action':'backup_restore_file','path':snapshot,'member':'next/index.php',
+                             'destination':'recovered.php','revision':archive_contents['revision']})
+content = call(account_url + '/files', {'action':'read','path':'recovered.php'})['content']
+assert base64.b64decode(content)==b'<?php echo "new-root";'
 call(account_url + '/files', {'action':'backup_restore','path':snapshot,'destination':'restore'})
 content = call(account_url + '/files', {'action':'read','path':'restore/next/index.php'})['content']
 assert base64.b64decode(content)==b'<?php echo "new-root";'
@@ -75,6 +82,12 @@ except urllib.error.HTTPError as e:
     assert e.code==404
 else:
     raise AssertionError('A different tenant listed another account’s files.')
+try:
+    call(account_url + '/files', {'action':'backup_contents','path':snapshot})
+except urllib.error.HTTPError as e:
+    assert e.code==404
+else:
+    raise AssertionError('A different tenant browsed another account’s backup.')
 csrf = call('/login', {'username':'vmadmin','password':password})['csrf']
 for engine in call(account_url + '/databases')['engines']:
     fields = {'action':'create','engine':engine,'label':'probe'+engine}

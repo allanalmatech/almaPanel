@@ -15,6 +15,8 @@ Complete DEPLOYMENT.md first, using a disposable EC2 VM. Claim the initial admin
 9. For optional mail hosting, follow the [Postfix and Dovecot setup guide](docs/MAIL.md).
    Check relay denial, mailbox authentication and local delivery before opening
    external access. For the software update channel, see [Signed updates](docs/UPDATES.md).
+10. Configure the site backup repository and verify recovery using
+    [Website backup and recovery](docs/BACKUPS.md).
 
 The [feature matrix](FEATURE_MATRIX.md) and [release checklist](RELEASE_CHECKLIST.md)
 track account termination, network management, administrator permissions,

@@ -6,10 +6,11 @@ from urllib.parse import parse_qs
 
 from backend import core as c
 
-FILE_READS = {'list', 'read', 'search', 'download', 'trash_list', 'backups', 'backup_read'}
+FILE_READS = {'list', 'read', 'search', 'download', 'trash_list', 'backups', 'backup_read',
+              'backup_contents', 'backup_verify'}
 FILE_WRITES = {'write', 'mkdir', 'rename', 'delete', 'copy', 'chmod', 'trash', 'trash_restore',
                'trash_purge', 'archive', 'extract', 'copy_tree',
-               'backup_create', 'backup_restore', 'backup_delete'}
+               'backup_create', 'backup_restore', 'backup_restore_file', 'backup_delete'}
 
 
 def allowed(body, names):

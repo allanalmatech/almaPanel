@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.5",
+    "version": "0.1.0-alpha.6",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -3095,7 +3095,10 @@
                       "backup_create",
                       "backup_read",
                       "backup_restore",
-                      "backup_delete"
+                      "backup_delete",
+                      "backup_contents",
+                      "backup_verify",
+                      "backup_restore_file"
                     ]
                   },
                   "path": {
@@ -3124,6 +3127,10 @@
                   },
                   "create_only": {
                     "type": "boolean"
+                  },
+                  "member": {
+                    "type": "string",
+                    "description": "Source path of the file inside the backup ZIP."
                   }
                 },
                 "required": [
@@ -5267,6 +5274,108 @@
                 "required": [
                   "action"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/offsite-backups": {
+      "get": {
+        "summary": "Read the most recent administrator website backup status",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Operation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Request an encrypted website backup",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Operation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
               }
             }
           }

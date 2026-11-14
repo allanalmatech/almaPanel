@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import sys
 from backend.core import name,domain,Problem
-from agent import databases, dns, mail, metrics, php_settings, sftp_access, site_security, sites
+from agent import databases, dns, files, mail, metrics, php_settings, sftp_access, site_security, sites
 
 BASE=Path('/srv/almapanel/accounts')
 REGISTRY=Path('/var/lib/almapanel-agent/registry.json')
@@ -128,23 +128,23 @@ def account_create(account):
     except Exception:
         data[account]['state']='failed';save(data);raise
 
+def ensure_account_private(home, tenant):
+    private = home / 'panel-files'
+    # Only root can create or replace a direct child of the account home.
+    try:
+        private.mkdir(mode=0o700)
+    except FileExistsError:
+        if private.is_symlink() or not private.is_dir() or private.stat().st_uid != tenant.pw_uid:
+            raise ValueError('Invalid account storage. Ask the server administrator to inspect it.')
+    else:
+        os.chown(private, tenant.pw_uid, tenant.pw_gid)
+    return private
+
+
 def files_argv(account, home, request):
     argv = [sys.executable, '-I', str(ROOT / 'agent/files.py'), str(home)]
-    if request.get('action') in {
-        'backup_create', 'backup_scheduled', 'backups', 'backup_read', 'backup_restore', 'backup_delete',
-        'trash', 'trash_list', 'trash_restore', 'trash_purge', 'sql_import', 'sql_export', 'sql_download', 'sql_delete',
-    }:
-        private = BASE / account / 'panel-files'
-        tenant = pwd.getpwnam('ap_' + account)
-        # Only root can create or replace a direct child of the account home.
-        try:
-            private.mkdir(mode=0o700)
-        except FileExistsError:
-            if private.is_symlink() or not private.is_dir() or private.stat().st_uid != tenant.pw_uid:
-                raise ValueError('Invalid account storage. Ask the server administrator to inspect it.')
-        else:
-            os.chown(private, tenant.pw_uid, tenant.pw_gid)
-        argv.append(str(private))
+    if request.get('action') in files.PRIVATE_ACTIONS | {'sql_import', 'sql_export', 'sql_download', 'sql_delete'}:
+        argv.append(str(ensure_account_private(BASE / account, pwd.getpwnam('ap_' + account))))
     return argv
 
 
@@ -430,6 +430,11 @@ def dispatch(operation,args):
             raise ValueError('Enroll a release verification key on the server first.')
         run(['/usr/bin/systemctl', '--no-block', 'start', 'almapanel-update.service'])
         return {'message': 'Update check requested. Refresh status shortly.'}
+    if operation == 'backup.offsite.trigger':
+        if not Path('/etc/almapanel/offsite-backup/repository.json').is_file():
+            raise ValueError('Configure the off-site repository first.')
+        run(['/usr/bin/systemctl', '--no-block', 'start', 'almapanel-offsite-backup.service'], timeout=10)
+        return {'message': 'Website backup requested. Refresh status to track the run.'}
     if operation=='system.stats':
         import shutil
         mem={k:int(v.split()[0])*1024 for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())}

@@ -62,6 +62,9 @@ sudo bash /opt/almapanel/installer/diagnostics.sh
 Root configuration: `/etc/almapanel`. Source: `/opt/almapanel`. Panel state: `/var/lib/almapanel`. Agent state: `/var/lib/almapanel-agent`. Customer homes: `/srv/almapanel/accounts`. Install log: `/var/log/almapanel/install.log`. Logs are not exposed as raw root-readable files in the browser. Do not publish setup tokens, sessions or private keys in support logs.
 
 ## Backup / restoration
+Use [Website backup and recovery](docs/BACKUPS.md) for selective website
+restores or encrypted local, S3-compatible and SFTP website snapshots.
+
 `sudo bash /opt/almapanel/installer/backup.sh --control-plane` briefly stops panel services, backs up SQLite via its backup API, and snapshots configuration and root registry with checksums. Websites continue serving. Snapshots are root-only and unencrypted; encrypt before remote storage. They contain no customer website/database/mail data and do not reconstruct Linux identities.
 
 `sudo bash /opt/almapanel/installer/restore.sh /var/backups/almapanel/control-ID --confirm-control-plane-restore` restores only panel database state on the same server/version after checksums and exact registry equality. It refuses changed OS resource ownership. Previous database files are saved; sessions are invalidated. It does not restore config certificates. Test this on a clone before use. Full-account and disaster recovery restoration are not implemented. For current evaluation recovery, use a quiesced whole-VM/EBS snapshot and test restoration separately.

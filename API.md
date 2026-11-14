@@ -352,7 +352,7 @@ credentials go directly to the local agent and stay out of job payloads.
 | `/mfa` | GET, POST | Get status or begin, confirm or disable TOTP. Recovery codes are shown on confirmation only. |
 | `/tokens` | GET, POST | List, create or revoke read-only bearer tokens. The token value is shown once. |
 | `/accounts/{id}/domains` | GET, POST | List or create, edit, remove, select primary, generate DNS proof or verify it. Web changes are queued. |
-| `/accounts/{id}/files` | GET, POST | File Manager with search, copy, move, archive/extract, Trash and website backup operations. |
+| `/accounts/{id}/files` | GET, POST | File Manager with search, copy, move, archive/extract, Trash, website backup browse, integrity checks and restore. |
 | `/accounts/{id}/backup-schedule` | GET, POST | Website snapshots with interval 0, 24 or 168 hours and retain 1–10. |
 | `/accounts/{id}/databases` | GET, POST | List databases and engines, or create, inspect size, reset password, import, export, download, delete export or delete a database. |
 | `/accounts/{id}/tls` | GET, POST | List certificate status and document roots, or issue, upload or toggle HTTPS redirect. |
@@ -367,6 +367,28 @@ credentials go directly to the local agent and stay out of job payloads.
 API tokens use `Authorization: Bearer <token>`. They permit GET on account
 inventory, domain lists, stats and metrics. Use a session for every operation
 with side effects. See [docs/HOSTING.md](docs/HOSTING.md) for host prerequisites.
+
+### Selective website restore
+
+Use POST with the session, CSRF token and the scoped account ID.
+
+| Action | Request fields | Success fields |
+| --- | --- | --- |
+| `backup_contents` | Archive `path`, optional `query`, `offset` and `revision` | `entries` with file `path` and byte `size`, plus `total`, `next_offset` and `revision` |
+| `backup_verify` | Archive `path`, optional `revision` | `message`, `files`, `bytes` |
+| `backup_restore_file` | Archive `path`, source `member`, new `destination` under public_html and matching `revision` | `message` and restored `path` |
+
+Use the revision from `backup_contents` when paging and restoring. The agent
+reports stale or damaged archives and destination conflicts as 502 responses.
+An account outside the caller’s scope returns 404.
+
+### Off-site website backup status
+
+An administrator session can GET `/offsite-backups` for the latest recorded
+backup progress, outcome and update time. POST requests a background run
+through the installed backup service. POST requires the panel Origin and CSRF
+token. The response confirms submission of the request. Use GET to read the
+backup outcome.
 
 ## SFTP, DNS Track and Notifications
 

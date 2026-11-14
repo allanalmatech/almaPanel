@@ -13,6 +13,9 @@ Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
    has enabled Postfix and Dovecot. Create a mailbox for a verified domain
    and use its full address, password and the displayed connection settings
    in your email client. See the [mail guide](docs/MAIL.md).
+9. In **Website Backups**, choose **Browse files** to search a backup and
+   verify it. Choose **Restore file** to recover one file to an unused path.
+   See [Website backup and recovery](docs/BACKUPS.md).
 
 Suspended accounts cannot log in to the panel. Report failed jobs with the
 job ID and keep credentials private. Use **Feature Availability** to check

@@ -4,6 +4,7 @@
 Requires playwright and Chromium. Screenshots are temporary QA output only.
 """
 import os
+import json
 from pathlib import Path
 import secrets
 import ssl
@@ -14,6 +15,8 @@ import threading
 from wsgiref.simple_server import make_server,WSGIRequestHandler
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from playwright.sync_api import sync_playwright
+from agent.files import operate
+from agent.file_tools import NOFOLLOW_DIR
 from backend import core as c
 from backend.app import application
 class Quiet(WSGIRequestHandler):
@@ -73,6 +76,58 @@ with tempfile.TemporaryDirectory() as temp:
             page.locator('#mail-create [name=quota_mib]').fill('32')
             page.get_by_role('button',name='Create mailbox',exact=True).click()
             page.get_by_text('Mail configuration saved.',exact=True).wait_for()
+            website = Path(temp) / 'website'
+            private = Path(temp) / 'private'
+            website.mkdir()
+            (private / 'backups').mkdir(parents=True)
+            (website / 'page.html').write_text('Back up this page.')
+
+            def backup_call(fields):
+                root = os.open(website, NOFOLLOW_DIR)
+                try:
+                    state = os.open(private, NOFOLLOW_DIR)
+                    try:
+                        return operate(root, fields, state)
+                    finally:
+                        os.close(state)
+                finally:
+                    os.close(root)
+
+            def browser_backup(route):
+                try:
+                    result = backup_call(route.request.post_data_json)
+                    route.fulfill(status=200, content_type='application/json', body=json.dumps(result))
+                except (OSError, ValueError) as error:
+                    route.fulfill(status=409, json={'error': str(error)})
+
+            page.route('**/api/accounts/*/files', browser_backup)
+            page.locator('#nav a[href="#backups"]').click()
+            page.get_by_role('button',name='Create website backup').click()
+            page.get_by_role('button',name='Browse files').click()
+            page.get_by_role('cell',name='page.html').wait_for()
+            page.get_by_role('button',name='Verify archive').click()
+            page.get_by_text('ZIP integrity check passed. 1 file checked.',exact=True).wait_for()
+            page.get_by_role('button',name='Restore file',exact=True).click()
+            page.get_by_role('textbox',name='New path under public_html').fill('recovered.html')
+            page.get_by_role('button',name='Restore to path').click()
+            page.get_by_text('Restored to recovered.html.',exact=True).wait_for()
+            assert (website / 'recovered.html').read_text() == 'Back up this page.'
+            offsite_status = {'state': 'succeeded', 'message': 'Encrypted website snapshot saved.'}
+
+            def browser_offsite(route):
+                if route.request.method == 'POST':
+                    offsite_status.update(state='running', message='Uploading encrypted website archives.',
+                                          completed=1, total=1, updated_at=100)
+                    route.fulfill(json={'message': 'Website backup requested.'})
+                else:
+                    route.fulfill(json=offsite_status)
+
+            page.route('**/api/offsite-backups', browser_offsite)
+            page.locator('#nav a[href="#offsite-backups"]').click()
+            page.get_by_role('heading',name='Off-site backups',exact=True).wait_for()
+            page.get_by_role('button',name='Run website backup').click()
+            page.get_by_text('Website backup requested.',exact=True).wait_for()
+            page.get_by_role('progressbar',name='Website archives prepared').wait_for()
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.locator('#search').fill('file manager')
             page.locator('.tool[href="#files"]').wait_for()
@@ -106,6 +161,6 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('heading',name='Sign in to your account').wait_for()
             assert not errors, errors
             browser.close()
-            print('Browser acceptance passed for setup, login, packages, mail form, search, profile, API tokens, theme, navigation and logout.')
+            print('Browser acceptance passed for setup, login, packages, mail form, ZIP restore, search, profile, API tokens, theme, navigation and logout.')
     finally:
         server.shutdown();thread.join();os.environ.pop('ALMA_ORIGIN',None)

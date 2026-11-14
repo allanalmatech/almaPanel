@@ -1,7 +1,7 @@
 # Feature matrix
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**Alpha.3 evaluation.** Core installation and first-admin setup were verified by
+**Alpha.6 evaluation.** Core installation and first-admin setup were verified by
 the operator on Amazon Linux 2023 during alpha.1. The table distinguishes local
 tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 
@@ -25,7 +25,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | FTP Accounts | Files | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | FTP Connections | Files | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Backup | Files | Partial | Private website ZIP and SQL dump | Local ZIP restore | Ubuntu 24.04 / AL2023 | Website archive and SQL are separate; no mail data |
-| Backup Wizard | Files | Partial | Website backups and SQL import/export UI | Local ZIP tests | Ubuntu 24.04 / AL2023 | Full-account guided recovery remains open |
+| Backup Wizard | Files | Partial | Website archive browsing, verification and selective restore | Local ZIP and Chromium workflow tests | Ubuntu 24.04 / AL2023 | Full-account guided recovery remains open |
 | Git Version Control | Files | Partial | Public Git branch staging under tenant UID | URL and branch validation | Ubuntu 24.04 / AL2023 | No private repos, webhooks, build scripts or push |
 | Archive creation | Files | Implemented locally | ZIP under tenant UID | Round trip and size budget tests | Ubuntu 24.04 / AL2023 | 64 MiB and 5,000-entry default limits |
 | ZIP extraction | Files | Implemented locally | Staging, size limits and no-overwrite publish | Rejects links, absolute paths and traversal | Ubuntu 24.04 / AL2023 | Live workload acceptance pending |
@@ -153,11 +153,11 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Full-account backup | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Website/database/mail/DNS backup | Backup and recovery | Partial | Website ZIP plus separate SQL export | Local website restore | Ubuntu 24.04 / AL2023 | Mail, DNS and unified snapshot remain open |
 | Scheduled backups | Backup and recovery | Partial | Daily or weekly website snapshots | Local scheduler and retention tests | Ubuntu 24.04 / AL2023 | No SQL, mail or DNS scheduling |
-| Incremental backups | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| SFTP/S3 remote storage | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Encrypted backup | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Retention and integrity policies | Backup and recovery | Partial | Scheduled website retention and ZIP CRC validation | Local retention tests | Ubuntu 24.04 / AL2023 | No complete policy, encryption or remote verification |
-| Individual-file restore | Backup and recovery | Partial | Trash restoration and ZIP restore to a new folder | Local conflict and restore tests | Ubuntu 24.04 / AL2023 | No selective restore UI from snapshots |
+| Incremental backups | Backup and recovery | Partial | Restic deduplicates website snapshot data across runs | Real restic local snapshot test | Ubuntu 24.04 / AL2023 | Website scope and staging limits |
+| SFTP/S3 remote storage | Backup and recovery | Partial | Administrator-configured restic SFTP and HTTPS S3 repositories | Local protocol fixtures with real restic | Ubuntu 24.04 / AL2023 | External repository and EC2 verification pending |
+| Encrypted backup | Backup and recovery | Partial | Restic repository encryption for website archives | Real restic recovery and wrong-password test | Ubuntu 24.04 / AL2023 | SQL, mail and DNS remain separate |
+| Retention and integrity policies | Backup and recovery | Partial | Website ZIP integrity check and host-scoped restic retention | Local CRC, retention and full repository data tests | Ubuntu 24.04 / AL2023 | Production retention, snapshot scheduling and remote acceptance pending |
+| Individual-file restore | Backup and recovery | Implemented locally | Browse/search ZIP and recover to an unused path | Local conflict, corruption and Chromium filesystem tests | Ubuntu 24.04 / AL2023 | Full EC2 acceptance pending |
 | Complete-account restore | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Migration between servers | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Ubuntu clean installer | Installer and release | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | 24.04 amd64/arm64 targets, not certified |

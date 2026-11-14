@@ -21,9 +21,8 @@ directory = file_tools.directory
 regular = file_tools.regular
 
 PRIVATE_ACTIONS = {
-    'backup_create', 'backup_scheduled', 'backups', 'backup_read', 'backup_restore', 'backup_delete',
     'trash', 'trash_list', 'trash_restore', 'trash_purge',
-}
+} | file_tools.BACKUP_ACTIONS
 
 def operate(root, request, private=None):
     parts = components(request.get('path', ''))
@@ -204,6 +203,25 @@ def cron_script(root, parts, action):
 
 
 if __name__=='__main__':
+    if len(sys.argv) == 3 and sys.argv[2] in ('--site-snapshot', '--import-backup'):
+        try:
+            if os.geteuid() == 0:
+                raise ValueError('Website snapshots require the hosting account identity.')
+            root = os.open(sys.argv[1], file_tools.NOFOLLOW_DIR)
+            try:
+                if sys.argv[2] == '--site-snapshot':
+                    file_tools.write_zip(root, sys.stdout.buffer, file_tools.BACKUP_BYTES, compress=False)
+                else:
+                    try:
+                        os.mkdir('backups', 0o700, dir_fd=root)
+                    except FileExistsError:
+                        pass
+                    print(file_tools.import_backup(root, sys.stdin.buffer))
+            finally:
+                os.close(root)
+        except (OSError, ValueError) as error:
+            sys.exit(str(error))
+        sys.exit(0)
     try:
         root = os.open(sys.argv[1], file_tools.NOFOLLOW_DIR)
         private = None

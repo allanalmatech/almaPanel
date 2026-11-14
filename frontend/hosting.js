@@ -57,10 +57,12 @@ async function backupsView(epoch) {
         '<section class="panel"><div class="toolbar"><button id="make-backup">Create website backup</button></div>' +
         table(['Archive', 'Size', 'Created', 'Actions'], backups.map((item, index) => [
             esc(item.name), esc((item.size / 1024).toFixed(1) + ' KiB'), esc(new Date(item.created * 1000).toLocaleString()),
-            `<button class="subtle" data-backup-download="${index}">Download</button>
+            `<button class="subtle" data-backup-browse="${index}">Browse files</button>
+             <button class="subtle" data-backup-download="${index}">Download</button>
              <button class="subtle" data-backup-restore="${index}">Restore into folder</button>
              <button class="subtle" data-backup-delete="${index}">Delete</button>`
-        ])) + `</section><section class="panel"><h2>Scheduled backups</h2><form id="backup-schedule">
+        ])) + `</section><section id="backup-browser" class="panel" hidden></section>
+        <section class="panel"><h2>Scheduled backups</h2><form id="backup-schedule">
         <label>Frequency<select name="interval_hours">
         <option value="0">Off</option><option value="24">Daily</option><option value="168">Weekly</option></select></label>
         ${field('retain', 'Keep this many scheduled backups', 'number', 'min="1" max="10" value="' + esc(schedule.retain) + '"')}
@@ -79,6 +81,15 @@ async function backupsView(epoch) {
         notice(result.message);
         if (activeView(epoch, base)) await route();
     });
+    let sequence = 0;
+    actionHandler(scope, '[data-backup-browse]', async button => {
+        const name = backups[Number(button.dataset.backupBrowse)].name;
+        const browser = $('#backup-browser');
+        const selected = ++sequence;
+        const stillOpen = () => activeView(epoch, base) && selected === sequence;
+        browser.hidden = false;
+        await browseBackup(path, name, browser, stillOpen);
+    });
     actionHandler(scope, '[data-backup-download]', async button => {
         const name = backups[Number(button.dataset.backupDownload)].name;
         downloadBlob(new Blob(await readLargeFile(path, 'backup_read', name), {type: 'application/zip'}), name);
@@ -94,6 +105,102 @@ async function backupsView(epoch) {
         notice((await filePath(path, 'backup_delete', {path: name})).message);
         if (activeView(epoch, base)) await route();
     });
+}
+
+async function browseBackup(path, name, panel, stillOpen) {
+    panel.innerHTML = `<h2>Backup contents</h2><p><code>${esc(name)}</code></p>
+        <form id="backup-search"><label>Find a file<input type="search" name="query" maxlength="120"></label>
+        <button type="submit">Search</button></form>
+        <button id="backup-verify" class="subtle" disabled>Verify archive</button>
+        <p id="backup-status" role="status"></p><div id="backup-files"></div><div id="backup-destination"></div>`;
+    const status = $('#backup-status');
+    let revision = '';
+    let query = '';
+    let offset = 0;
+    let generation = 0;
+    async function load() {
+        const request = ++generation;
+        const verify = $('#backup-verify');
+        const listing = $('#backup-files');
+        const restore = $('#backup-destination');
+        listing.innerHTML = '';
+        restore.innerHTML = '';
+        verify.disabled = true;
+        status.textContent = 'Loading files…';
+        let data;
+        try {
+            data = await filePath(path, 'backup_contents', {path: name, query, offset, revision});
+        } catch (error) {
+            if (stillOpen() && request === generation) status.textContent = error.message;
+            return;
+        }
+        if (!stillOpen() || request !== generation) return;
+        revision = data.revision;
+        verify.disabled = false;
+        const end = offset + data.entries.length;
+        status.textContent = data.entries.length ? `Files ${offset + 1}–${end} of ${data.total}` : 'No matching files.';
+        listing.innerHTML = table(['File', 'Size', 'Action'], data.entries.map((item, index) => [
+            esc(item.path), esc((item.size / 1024).toFixed(1) + ' KiB'),
+            `<button class="subtle" data-restore-member="${index}">Restore file</button>`
+        ])) + `<div class="toolbar">
+            ${offset ? '<button id="backup-first" class="subtle">First page</button>' : ''}
+            ${data.next_offset === null ? '' : '<button id="backup-next" class="subtle">Next page</button>'}</div>`;
+        actionHandler(listing, '#backup-first', async () => { offset = 0; await load(); });
+        actionHandler(listing, '#backup-next', async () => { offset = data.next_offset; await load(); });
+        actionHandler(listing, '[data-restore-member]', async button => {
+            const item = data.entries[Number(button.dataset.restoreMember)];
+            const label = item.path.split('/').at(-1);
+            restore.innerHTML = `<form id="backup-file-restore"><h3>Restore ${esc(item.path)}</h3>
+                ${field('destination', 'New path under public_html', 'text', 'maxlength="2048"')}
+                <p>Choose an existing destination folder and an unused file name.</p>
+                <button type="submit">Restore to path</button></form>`;
+            const input = $('#backup-file-restore').elements.destination;
+            input.value = 'restored-' + label;
+            form('#backup-file-restore', async fields => {
+                const result = await filePath(path, 'backup_restore_file', {
+                    path: name, member: item.path, destination: fields.destination, revision
+                });
+                if (stillOpen() && request === generation) {
+                    status.textContent = `Restored to ${result.path}.`;
+                    restore.innerHTML = '';
+                }
+            });
+            input.focus();
+        });
+    }
+    form('#backup-search', async fields => { query = fields.query.trim(); offset = 0; await load(); });
+    actionHandler(panel, '#backup-verify', async () => {
+        const request = generation;
+        status.textContent = 'Checking ZIP integrity…';
+        try {
+            const result = await filePath(path, 'backup_verify', {path: name, revision});
+            if (stillOpen() && request === generation) {
+                const noun = result.files === 1 ? 'file' : 'files';
+                status.textContent = `${result.message} ${result.files} ${noun} checked.`;
+            }
+        } catch (error) {
+            if (stillOpen() && request === generation) status.textContent = error.message;
+        }
+    });
+    await load();
+    if (stillOpen()) $('#backup-search').elements.query.focus();
+}
+
+async function offsiteBackupsView(epoch) {
+    const backup = await api('/offsite-backups');
+    if (routeEpoch !== epoch) return;
+    view('Off-site backups', 'Run an encrypted website backup and review its latest status.',
+        `<section class="panel"><h2>Latest website backup</h2><p>${esc(backup.message)}</p>
+        ${backup.updated_at ? `<p>Updated ${esc(new Date(backup.updated_at * 1000).toLocaleString())}</p>` : ''}
+        ${backup.state === 'running' && backup.total > 0 ? `<progress aria-label="Website archives prepared"
+            value="${esc(backup.completed)}" max="${esc(backup.total)}"></progress>` : ''}
+        <button id="offsite-run" ${backup.state === 'running' ? 'disabled' : ''}>Run website backup</button>
+        <button id="offsite-refresh" class="subtle">Refresh status</button></section>`);
+    actionHandler($('#main'), '#offsite-run', async () => {
+        notice((await api('/offsite-backups', {})).message);
+        if (routeEpoch === epoch) await route();
+    });
+    $('#offsite-refresh').onclick = route;
 }
 
 async function trashView(epoch) {

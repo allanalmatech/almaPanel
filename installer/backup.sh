@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
-# Control-plane backup only. NOT a customer data / disaster recovery backup.
 set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 ]] || { echo 'Run as root'; exit 1; }
-[[ ${1:-} == --control-plane ]] || { echo 'Usage: backup.sh --control-plane'; exit 2; }
+if [[ ${1:-} == --offsite ]]; then
+ SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ source "$SOURCE/platform.sh"
+ shift
+ exec "$PANEL_PY" -I "$SOURCE/offsite_backup.py" "$@"
+fi
+[[ ${1:-} == --control-plane ]] ||
+ { echo 'Usage: backup.sh --control-plane or backup.sh --offsite --help'; exit 2; }
 install -d -m 700 /var/backups/almapanel
 DEST=$(mktemp -d /var/backups/almapanel/control-XXXXXXXX)
 export DEST

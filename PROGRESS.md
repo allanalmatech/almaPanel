@@ -127,3 +127,29 @@ submission, local forwarding, IMAP quota enforcement and archive access checks.
 It still needs a live VM run. Public mail DNS, TLS certificate renewal, EC2
 outbound delivery, DKIM/SPF/DMARC, spam filtering, webmail, logs and mail recovery
 remain open. The production release gate remains closed.
+
+## 2026-11-14 · 0.1.0-alpha.6
+
+Website Backups can browse and search existing ZIPs, verify each file, and
+recover an individual file to an unused path. The same account Linux identity
+and file descriptor checks are used for backup creation and restore.
+
+Added root-configured restic repositories for encrypted local, S3 and SFTP
+website snapshots, an optional daily timer, a dashboard run/status screen,
+host-scoped retention, and recovery into a private account backup list.
+S3 uses scoped credentials in a mode-0600 file. SFTP checks a pinned host key.
+
+- `make check` passed 66 local tests plus Python, JavaScript and shell syntax.
+- Chromium exercised backup creation, browsing, verification and single-file
+  recovery against the actual filesystem helper through a local HTTP fixture.
+  It also exercised the off-site dispatch and progress display with a fixture.
+- Restic 0.18 passed a local encrypted recovery drill, full repository check,
+  wrong-password rejection and scoped retention. Upload and retrieval also
+  passed against local HTTPS S3 and SSH/SFTP protocol fixtures.
+- OpenAPI validation, Bandit at the CI threshold, the basic secret scan and
+  systemd unit verification passed.
+
+The optional disposable Amazon Linux runner exercises the installed CLI and
+tenant-owned backup import. Live startup, scheduled jobs and remote-provider
+recovery on EC2 remain pending. Off-site snapshots cover website files. SQL,
+mail, DNS and full-account disaster recovery remain open.
