@@ -29,10 +29,13 @@ with (updater.STATE / "lock").open("w") as lock:
     else:
         updater.restart_and_verify()
 PY
-for helper in updater.py update.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh renew-site-tls.sh; do
+for helper in updater.py update.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh renew-site-tls.sh; do
  install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
 done
 install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/
+install -d -m 755 /opt/almapanel/services/sftp
+install -m 644 "$SOURCE/services/sftp/sshd_config" /opt/almapanel/services/sftp/
+install -m 644 "$SOURCE/services/systemd/almapanel-sftp.service" /opt/almapanel/services/systemd/
 install -m 644 "$SOURCE/docs/HOSTING.md" /opt/almapanel/docs/HOSTING.md
 sed "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
  "$SOURCE/services/systemd/almapanel-update.service" > /etc/systemd/system/almapanel-update.service

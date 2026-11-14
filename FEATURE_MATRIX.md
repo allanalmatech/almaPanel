@@ -84,7 +84,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Processes | Metrics | Partial | Read-only per-UID process list | Local Linux process parsing | Ubuntu 24.04 / AL2023 | No process signaling UI |
 | Inode Usage | Metrics | Partial | Real account inode count | GNU du adapter | Ubuntu 24.04 / AL2023 | No enforced inode quota |
 | I/O Usage | Metrics | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| SSH Access | Security | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
+| SSH Access | Security | Partial | Independent chrooted, public-key SFTP with key revocation and suspension | OpenSSH config and local key tests passed | Ubuntu 24.04 / AL2023 | Live login/upload acceptance pending; shell access remains open |
 | SSL/TLS | Security | Partial | Certbot HTTP-01, custom PEM, redirects and renewal timer | Local Nginx/OpenSSL checks | Ubuntu 24.04 / AL2023 | Public ACME, wildcard and reboot validation pending |
 | SSL/TLS Status | Security | Partial | Live expiry check and dashboard warning status | Local OpenSSL checks | Ubuntu 24.04 / AL2023 | No email alert delivery |
 | Hotlink Protection | Security | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
@@ -120,7 +120,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Pipeline stages | Git | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Environment secrets | Git | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Cron Jobs | Advanced | Partial | Schedule existing PHP scripts with time/resource limits | Scheduler tests | Ubuntu 24.04 / AL2023 | No arbitrary shell commands or cron expressions |
-| DNS Track | Advanced | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
+| DNS Track | Advanced | Implemented | Fixed DNS lookups via dig | Local input and API verification | Ubuntu 24.04 / AL2023 | Resolver visibility only |
 | Indexes | Advanced | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Error Pages | Advanced | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Apache Handlers | Advanced | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
@@ -147,7 +147,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Job history | Administration | Implemented locally / partial | Not applicable or control-plane only | Core tests where applicable; see TESTING | Ubuntu 24.04 target | State machine; root adapter tests pending |
 | Updates | Administration | Partial | Signed code updater with rollback | Local version and archive checks | Ubuntu 24.04 / AL2023 | No signed release assets or live EC2 rollback verification |
 | Server health | Administration | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Actual /proc and systemd data |
-| Notifications | Administration | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
+| Notifications | Administration | Partial | Account-scoped job outcome inbox with per-user dismissal | Local API tests | Ubuntu 24.04 / AL2023 | Delivery and maintenance notifications remain open |
 | Control-plane backup | Backup and recovery | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Snapshot code; not customer recovery |
 | Control-plane restore | Backup and recovery | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Same-server exact registry guard; not live tested |
 | Full-account backup | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |

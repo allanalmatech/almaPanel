@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import sys
 from backend.core import name,domain,Problem
-from agent import databases, dns, metrics, php_settings, site_security, sites
+from agent import databases, dns, metrics, php_settings, sftp_access, site_security, sites
 
 BASE=Path('/srv/almapanel/accounts')
 REGISTRY=Path('/var/lib/almapanel-agent/registry.json')
@@ -417,6 +417,8 @@ def install_wordpress(account, data, args):
 
 
 def dispatch(operation,args):
+    if operation == 'dns.lookup':
+        return dns.lookup(args.get('domain'), args.get('kind'), run)
     if operation == 'dns.verify':
         return dns.verify_txt(args.get('domain'), args.get('token'), run)
     if operation == 'update.trigger':
@@ -447,10 +449,19 @@ def dispatch(operation,args):
     if operation=='account.state':
         state=args.get('state')
         if state not in ('active','suspended'): raise ValueError('Invalid state.')
-        changes = site_configs(account, data[account], suspended=state == 'suspended')
-        configs(changes,'nginx',['/usr/sbin/nginx','-t'])
-        data[account]['state']=state;save(data)
-        return {'message':'Web access state changed. Existing PHP requests may finish.'}
+        meta = data[account]
+        previous = meta['state']
+        configs(site_configs(account, meta, suspended=state == 'suspended'), 'nginx', ['/usr/sbin/nginx', '-t'])
+        meta['state'] = state
+        try:
+            sftp_access.sync(account, meta, atomic)
+            save(data)
+        except OSError:
+            meta['state'] = previous
+            sftp_access.sync(account, meta, atomic)
+            configs(site_configs(account, meta, suspended=previous == 'suspended'), 'nginx', ['/usr/sbin/nginx', '-t'])
+            raise
+        return {'message':'Website and SFTP login state changed. Existing sessions may finish.'}
     if data[account]['state']!='active': raise ValueError('Account suspended.')
     if operation in ('php.get', 'php.settings', 'php.log'):
         meta = data[account]
@@ -470,6 +481,8 @@ def dispatch(operation,args):
             configs({pool: php_pool(account, original)}, PHP_UNIT, [PHP_BIN, '-t'])
             raise
         return {'message': 'PHP settings applied.'}
+    if operation.startswith('sftp.'):
+        return sftp_access.manage(operation, account, data, args, atomic, save)
     if operation.startswith('site_security.'):
         return protect_site(operation, account, data, args)
     if operation == 'metrics.web':

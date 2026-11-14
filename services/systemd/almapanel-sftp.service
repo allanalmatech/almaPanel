@@ -1,0 +1,16 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+[Unit]
+Description=almaPanel tenant SFTP
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+RuntimeDirectory=almapanel-sftp
+ExecStartPre=/usr/sbin/sshd -t -f /etc/almapanel/sftp/sshd_config
+ExecStart=/usr/sbin/sshd -D -e -f /etc/almapanel/sftp/sshd_config
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

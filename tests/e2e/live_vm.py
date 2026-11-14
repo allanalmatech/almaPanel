@@ -95,3 +95,38 @@ for engine in call(account_url + '/databases')['engines']:
     assert chunk['content'] and chunk['done']
     call(account_url + '/databases', {'action':'export_delete','file':exported['file']})
 print('Live VM hosting checks passed for document roots, website restore, schedules and tenant boundaries.')
+
+
+if os.environ.get('ALMA_TEST_SFTP') == 'YES':
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='alma-sftp-test-') as temp:
+        folder = Path(temp)
+        private = folder / 'tenant'
+        subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-f',str(private)], check=True)
+        account_endpoint = account_url + '/sftp'
+        response = call(account_endpoint, {'action':'add','label':'Disposable VM acceptance',
+                                          'public_key':private.with_suffix('.pub').read_text().strip()})
+        assert response['message']
+        info = call(account_endpoint)
+        assert info['available'] and info['listen'] == '127.0.0.1'
+        known = folder / 'known_hosts'
+        known.write_text(f"[127.0.0.1]:{info['port']} " + Path('/etc/almapanel/sftp/host_ed25519.pub').read_text())
+        local = folder / 'probe.txt'
+        local.write_text('SFTP upload verification')
+        commands = ['/usr/bin/sftp','-b','-','-P',str(info['port']),'-i',str(private),
+                    '-o','BatchMode=yes','-o','IdentitiesOnly=yes','-o','StrictHostKeyChecking=yes',
+                    '-o',f'UserKnownHostsFile={known}',info['username'] + '@127.0.0.1']
+        transfer = subprocess.run(commands, input=f"pwd\nput {local} probe.txt\n", text=True,
+                                  capture_output=True, check=True, timeout=20)
+        assert 'Remote working directory: /public_html' in transfer.stdout
+        payload = call(account_url + '/files', {'action':'read','path':'probe.txt'})
+        assert base64.b64decode(payload['content']) == local.read_bytes()
+        outside = subprocess.run(commands, input='ls /etc/passwd\n', text=True,
+                                 capture_output=True, timeout=20)
+        assert outside.returncode != 0, 'SFTP exposed the host account database'
+        fingerprint = info['keys'][0]['fingerprint']
+        call(account_endpoint, {'action':'remove','fingerprint':fingerprint})
+        revoked = subprocess.run(commands, input='pwd\n', text=True,
+                                 capture_output=True, timeout=20)
+        assert revoked.returncode != 0, 'The revoked key still authenticated'
+    print('Live VM SFTP acceptance passed for login, upload, chroot and key revocation.')

@@ -86,3 +86,12 @@ Open modules include mail, FTP/WebDAV, SSH/SFTP, terminal, Node/Python/Ruby
 runtimes, OS quotas, private Git deployment, additional app management, DNSSEC
 and secondary DNS, full-account snapshots, remote backup and migration.
 The detailed status is in FEATURE_MATRIX.md and TODO.md.
+
+## 2026-11-14 · 0.1.0-alpha.4
+
+Added optional tenant SFTP on a separate OpenSSH listener with per-account
+chroots and Ed25519 public key registration. Suspension removes authorization
+for new SFTP sessions. Also added DNS Track and an in-panel operation inbox.
+Local unit tests and sshd configuration validation passed. The disposable VM
+runner now includes SFTP upload, chroot and revocation acceptance. The live
+Amazon Linux SFTP run is still pending.

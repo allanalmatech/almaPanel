@@ -120,3 +120,35 @@ services being tested. It creates test tenants and uses the real agent and
 Linux services. A live domain and working delegation are still needed for
 public BIND and ACME checks. Keep the panel accessible through your SSH tunnel.
 See [TESTING.md](../TESTING.md) and [FEATURE_MATRIX.md](../FEATURE_MATRIX.md).
+
+## SFTP access
+
+Enable a separate chrooted listener with `sudo bash installer/enable-sftp.sh`.
+It listens on loopback port 2222 by default. The script prints the server
+host key fingerprint. Compare that fingerprint in your SFTP client before
+accepting it. Add an OpenSSH Ed25519 public key in **SFTP Access**. Keep the
+corresponding private key on the client.
+
+For a loopback install, forward port 2222 through your existing system SSH
+connection. For example, run the tunnel on your own computer:
+
+```bash
+ssh -N -L 2222:127.0.0.1:2222 ec2-user@YOUR_EC2_IP
+```
+
+Then connect your SFTP client to `127.0.0.1:2222` as the username shown in
+the panel, such as `ap_customer`. Your virtual home exposes only that
+hosting account’s files. The service uses an independent config and host key.
+The web server reads uploads through the account’s existing ACLs.
+
+Use `--public` with the setup script on a first installation if you want
+clients to connect directly. Configure your EC2 rules for that port. Password
+and shell access are unavailable for this service. Removing a key or
+suspending an account blocks new logins. Existing transfers can finish.
+
+To validate end to end on a clean Amazon Linux VM, set
+`ALMA_TEST_SFTP=YES` when running `tests/installation/amazon_vm.sh`. The
+script checks upload, chroot isolation and revocation.
+
+**DNS Track** shows public records via the server’s resolver.
+**Notifications** shows completed and failed operations within your role’s scope.

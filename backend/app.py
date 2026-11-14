@@ -10,7 +10,7 @@ import sqlite3
 import time
 from urllib.parse import parse_qs
 from backend import core as c
-from backend import hosting, schedules, security
+from backend import hosting, notifications, schedules, security
 
 MAX_BODY = 1_500_000
 DUMMY_HASH = c.password_hash('dummy-password-for-timing-only')
@@ -26,13 +26,13 @@ def admin(user):
     if user['role'] != 'admin':
         raise c.Problem('Administrator required.', 403)
 
-def throttle(db, key):
+def throttle(db, key, *, limit=10, window=900):
     now = int(time.time())
     db.execute('DELETE FROM attempts WHERE reset<?', (now,))
     row = db.execute('SELECT * FROM attempts WHERE key=?', (key,)).fetchone()
-    if row and row['count'] >= 10:
-        raise c.Problem('Too many attempts. Try again after 15 minutes.', 429)
-    db.execute('INSERT INTO attempts(key,count,reset) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1', (key, now+900))
+    if row and row['count'] >= limit:
+        raise c.Problem('Too many requests. Try again after the rate limit resets.', 429)
+    db.execute('INSERT INTO attempts(key,count,reset) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1', (key, now+window))
     db.commit()
 
 def api(env, body, db, headers):
@@ -158,6 +158,13 @@ def api(env, body, db, headers):
         uid = db.execute("INSERT INTO users(username,password,role,owner_id,enabled,created) VALUES(?,?,'user',?,0,?)",(username,c.password_hash(body.get('password')),user['id'],int(time.time()))).lastrowid
         aid = db.execute("INSERT INTO accounts(user_id,name,owner_id,package_id,state,created) VALUES(?,?,?,?,'provisioning',?)",(uid,username,user['id'],package['id'],int(time.time()))).lastrowid
         return c.enqueue(db,user,aid,'account.create',{'name':username},ip)
+    if path == '/api/dns-lookup' and method == 'GET':
+        fields = parse_qs(env.get('QUERY_STRING', ''))
+        throttle(db, 'dns-lookup:' + str(user['id']), limit=20, window=60)
+        return c.rpc('dns.lookup', domain=c.domain(fields.get('domain', [''])[0]),
+                     kind=fields.get('type', ['A'])[0])
+    if path == '/api/notifications':
+        return notifications.inbox(db, user, method, body, ip)
     if path == '/api/jobs' and method == 'GET':
         return rows(db.execute("SELECT id,account_id,operation,state,result,created,finished FROM jobs WHERE ?='admin' OR actor_id=? ORDER BY id DESC LIMIT 100",(user['role'],user['id'])))
     if path == '/api/audit' and method == 'GET':
@@ -209,6 +216,8 @@ def api(env, body, db, headers):
             return c.rpc('account.stats', name=account['name'])
         if action == 'files':
             return hosting.files(db, user, account, method, env, body, ip)
+        if action == 'sftp':
+            return hosting.sftp(db, user, account, method, body, ip)
         if action == 'site-security':
             return hosting.site_security(db, user, account, method, env, body, ip)
         if action == 'php':

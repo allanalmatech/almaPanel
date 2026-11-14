@@ -196,3 +196,14 @@ def verify_txt(host, token, run):
     if '"' + token + '"' not in output.splitlines():
         raise ValueError('The required DNS TXT record is not visible yet.')
     return {'verified': True}
+
+
+def lookup(host, kind, run):
+    host = domain(host)
+    if kind not in ('A', 'AAAA', 'MX', 'NS', 'TXT', 'CAA', 'CNAME', 'SOA'):
+        raise ValueError('Choose a supported DNS lookup type.')
+    if not Path('/usr/bin/dig').is_file():
+        raise ValueError('Install dig with the domain verification setup script.')
+    output = run(['/usr/bin/dig', '-r', '+time=3', '+tries=1', '+noall', '+answer',
+                  '-q', host + '.', '-t', kind], timeout=8)
+    return {'hostname': host, 'type': kind, 'answer': output[:8000].splitlines()[:50]}

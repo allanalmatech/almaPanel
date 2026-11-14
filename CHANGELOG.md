@@ -30,3 +30,9 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Add website request and PHP log views, process metrics and the Amazon Linux
   disposable-VM acceptance script.
 - Normalize installed source permissions during code updates.
+
+## 0.1.0-alpha.4
+
+- Add an optional, separate chrooted SFTP listener and dashboard key controls.
+- Remove SFTP authorization when a hosting account is suspended.
+- Add DNS Track and an account-scoped operation notification inbox.

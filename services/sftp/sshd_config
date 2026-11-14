@@ -1,0 +1,26 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+Port @PORT@
+ListenAddress @LISTEN@
+HostKey /etc/almapanel/sftp/host_ed25519
+PidFile /run/almapanel-sftp/sshd.pid
+UsePAM yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+PermitRootLogin no
+AllowUsers ap_*
+AuthorizedKeysFile /etc/almapanel-sftp-keys/%u
+StrictModes yes
+DisableForwarding yes
+PermitTTY no
+PermitUserRC no
+PermitUserEnvironment no
+MaxAuthTries 4
+MaxSessions 1
+LoginGraceTime 30
+LogLevel VERBOSE
+ChrootDirectory %h
+ForceCommand internal-sftp -d /public_html -u 027 -P symlink,hardlink
+Subsystem sftp internal-sftp

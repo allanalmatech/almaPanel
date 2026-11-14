@@ -462,3 +462,10 @@ remaining behavior and live acceptance before completion.
   private Git deployment, and full-account backups and migration.
 - [ ] Finish signed GitHub release publication, public installer endpoint,
   rollback for schema/OS changes, external audit retention and release review.
+
+## Alpha.4 implementation and acceptance
+- [x] Add account SFTP key registration and revocation on an independent
+  chrooted listener. Suspension prevents new logins.
+- [x] Add DNS Track for common record queries and a dashboard job inbox.
+- [ ] Run the chroot, upload, authentication and revocation acceptance on EC2.
+- [ ] Add secure interactive shell and browser terminal after isolation review.

@@ -67,10 +67,11 @@ def initialize():
     with connect() as db:
         db.execute('PRAGMA journal_mode=WAL')
         db.executescript((ROOT / 'database/migrations/001_initial.sql').read_text())
-        from backend import hosting, schedules, security
+        from backend import hosting, notifications, schedules, security
         security.setup_tables(db)
         schedules.setup_tables(db)
         hosting.domain_table(db)
+        notifications.setup_tables(db)
         if not db.execute('SELECT 1 FROM users').fetchone():
             token = STATE / 'setup-token'
             if not token.exists():

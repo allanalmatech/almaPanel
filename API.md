@@ -367,3 +367,13 @@ credentials go directly to the local agent and stay out of job payloads.
 API tokens use `Authorization: Bearer <token>`. They permit GET on account
 inventory, domain lists, stats and metrics. Use a session for every operation
 with side effects. See [docs/HOSTING.md](docs/HOSTING.md) for host prerequisites.
+
+## SFTP, DNS Track and Notifications
+
+- `GET /accounts/{id}/sftp` returns the listener state, username, port and
+  registered public key fingerprints. POST accepts `action=add` with
+  `public_key` and `label` or `action=remove` with `fingerprint`.
+- `GET /dns-lookup?domain=example.com&type=A` returns answer records from
+  the server’s public DNS resolver. The session is rate limited.
+- `GET /notifications` lists up to 40 completed, failed or interrupted
+  jobs in the caller’s role scope. POST accepts the job `id` to dismiss.

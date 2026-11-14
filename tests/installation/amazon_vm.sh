@@ -10,5 +10,8 @@ if [[ ${ALMA_TEST_SQL:-NO} == YES ]]; then
  bash "$ROOT/installer/enable-databases.sh" mariadb
  bash "$ROOT/installer/enable-databases.sh" postgresql
 fi
+if [[ ${ALMA_TEST_SFTP:-NO} == YES ]]; then
+ bash "$ROOT/installer/enable-sftp.sh"
+fi
 /opt/almapanel/venv/bin/python "$ROOT/tests/e2e/live_vm.py"
 bash /opt/almapanel/installer/healthcheck.sh

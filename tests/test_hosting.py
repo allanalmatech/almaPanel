@@ -3,6 +3,7 @@ import base64
 import os
 from pathlib import Path
 import stat
+import secrets
 import subprocess
 import tempfile
 import time
@@ -10,7 +11,7 @@ import unittest
 from unittest.mock import Mock, patch
 import zipfile
 
-from agent import databases, deployments, dns, file_tools, metrics, php_settings, site_security, sites
+from agent import databases, deployments, dns, file_tools, metrics, php_settings, sftp_access, site_security, sites
 from agent.files import operate
 from backend import core as c, schedules, security
 from tests import test_core
@@ -167,6 +168,27 @@ class Validation(unittest.TestCase):
             deployments.branch_name('--help')
         self.assertEqual(deployments.branch_name('feature/site'), 'feature/site')
 
+    def test_sftp_stores_only_valid_public_keys_and_disables_suspended_users(self):
+        key = 'ssh-ed25519 ' + base64.b64encode(sftp_access.ED25519 + secrets.token_bytes(32)).decode()
+        with tempfile.TemporaryDirectory() as temporary:
+            keys = Path(temporary)
+            profile = {'listen': '127.0.0.1', 'port': 2222}
+            data = {'hosting': {'state': 'active'}}
+            with patch.object(sftp_access, 'KEYS', keys), patch.object(sftp_access, 'read_profile', return_value=profile):
+                def atomic(path, content, mode):
+                    path.write_text(content)
+                    path.chmod(mode)
+                save = Mock()
+                with self.assertRaises(ValueError):
+                    sftp_access.manage('sftp.add', 'hosting', data,
+                                       {'public_key': key + '\nother', 'label': 'test'}, atomic, save)
+                sftp_access.manage('sftp.add', 'hosting', data,
+                                   {'public_key': key + ' comment', 'label': 'test'}, atomic, save)
+                self.assertEqual((keys / 'ap_hosting').read_text(), 'restrict ' + key + '\n')
+                data['hosting']['state'] = 'suspended'
+                sftp_access.sync('hosting', data['hosting'], atomic)
+                self.assertFalse((keys / 'ap_hosting').exists())
+
     def test_directory_rule_and_php_settings_validation(self):
         with self.assertRaises(ValueError):
             site_security.rules_path('/../etc')
@@ -232,6 +254,23 @@ class HostingApi(unittest.TestCase):
             self.assertEqual(self.request(path, {**fields, 'action':'verify'})['status'], 200)
             rpc.assert_called_once_with('dns.verify', domain=fields['domain'], token=proof['body']['value'])
         self.assertEqual(self.request(path, fields)['body']['state'], 'queued')
+
+    def test_notifications_respect_account_scope_and_per_user_dismissal(self):
+        self.setup_admin()
+        pack = self.package()
+        owned = self.seed_account('hosting', 1, pack)
+        other = self.seed_account('outside', 1, pack)
+        with c.connect() as db:
+            for item in (owned, other):
+                db.execute("""INSERT INTO jobs(actor_id,account_id,operation,payload,state,created)
+                    VALUES(1,?,'domain.create','{}','failed',?)""", (item, int(time.time())))
+        ids = {entry['account']:entry['id'] for entry in self.request('/api/notifications')['body']}
+        self.login('hosting')
+        self.assertEqual([entry['account'] for entry in self.request('/api/notifications')['body']], ['hosting'])
+        self.assertEqual(self.request('/api/notifications', {'id':ids['outside']})['status'], 404)
+        self.assertEqual(self.request('/api/notifications', {'id':ids['hosting']})['status'], 200)
+        self.assertEqual(self.request('/api/notifications')['body'], [])
+        self.assertEqual(len(self.request('/api/notifications', cookie=self.admin_cookie)['body']), 2)
 
     def test_backup_schedule_never_queues_inactive_accounts_or_duplicates(self):
         self.setup_admin()

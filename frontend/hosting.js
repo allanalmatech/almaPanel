@@ -913,3 +913,66 @@ async function siteSecurityView(epoch) {
     select.onchange = () => load().catch(error => notice(error.message));
     await load();
 }
+
+async function sftpView(epoch) {
+    const base = boundAccount();
+    const endpoint = base + 'sftp';
+    const info = await api(endpoint);
+    if (!activeView(epoch, base)) return;
+    const rows = info.keys.map((key, index) => [
+        esc(key.label), `<code>${esc(key.fingerprint)}</code>`,
+        `<button class="subtle" data-sftp-revoke="${index}">Remove key</button>`
+    ]);
+    view('SFTP Access', 'Use a separate key-only SFTP connection to transfer files.',
+        '<section class="panel">' + (info.available ?
+            `<p>Username <code>${esc(info.username)}</code> · Port ${esc(info.port)}</p>
+             <p>${info.listen === '127.0.0.1' ? 'The listener is local to the server. Reach it through an SSH tunnel.' : 'Connect using this server’s hostname or IP address.'}</p>` +
+            table(['Key', 'Fingerprint', ''], rows) +
+            `<form id="sftp-key">
+             ${field('label', 'Key label', 'text', 'maxlength="64"')}
+             <label>OpenSSH Ed25519 public key<textarea name="public_key" rows="3" maxlength="1024" required placeholder="ssh-ed25519 …"></textarea></label>
+             <button type="submit">Add public key</button></form>`
+            : '<p>A server administrator needs to enable the separate SFTP listener.</p>') + '</section>');
+    if (!info.available) return;
+    form('#sftp-key', async fields => {
+        notice((await api(endpoint, {action: 'add', label: fields.label, public_key: fields.public_key.trim()})).message);
+        if (activeView(epoch, base)) await route();
+    });
+    actionHandler($('#main'), '[data-sftp-revoke]', async button => {
+        const key = info.keys[Number(button.dataset.sftpRevoke)];
+        if (!await confirmed(`Remove SFTP key ${key.label}?`)) return;
+        notice((await api(endpoint, {action: 'remove', fingerprint: key.fingerprint})).message);
+        if (activeView(epoch, base)) await route();
+    });
+}
+
+async function notificationsView(epoch) {
+    const notifications = await api('/notifications');
+    if (routeEpoch !== epoch) return;
+    view('Notifications', 'Review up to 40 recent job outcomes and dismiss those you have handled.',
+        '<section class="panel">' + table(['Operation', 'Account', 'Outcome', 'Time', ''], notifications.map((item, index) => [
+            esc(item.operation), esc(item.account || 'Server'), esc(item.state),
+            esc(new Date((item.finished || item.created) * 1000).toLocaleString()),
+            `<button class="subtle" data-dismiss-notification="${index}">Dismiss</button>`
+        ])) + '<p><a href="#jobs">Open operation history</a></p></section>');
+    actionHandler($('#main'), '[data-dismiss-notification]', async button => {
+        const item = notifications[Number(button.dataset.dismissNotification)];
+        await api('/notifications', {id: item.id});
+        if (routeEpoch === epoch) await route();
+    });
+}
+
+function dnsLookupView(epoch) {
+    view('DNS Track', 'Check records visible to the server’s DNS resolver.',
+        `<section class="panel"><form id="dns-lookup">
+            ${field('domain', 'Hostname', 'text', 'placeholder="example.com" maxlength="253"')}
+            <label>Record type<select name="type">${['A','AAAA','MX','NS','TXT','CAA','CNAME','SOA'].map(item => `<option>${item}</option>`).join('')}</select></label>
+            <button type="submit">Look up records</button>
+        </form><pre id="dns-answer" class="hosting-log" aria-live="polite"></pre></section>`);
+    form('#dns-lookup', async fields => {
+        const result = await api('/dns-lookup?' + new URLSearchParams(fields));
+        if (routeEpoch === epoch) {
+            $('#dns-answer').textContent = result.answer.join('\n') || 'No records in the answer section.';
+        }
+    });
+}

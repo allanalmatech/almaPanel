@@ -9,3 +9,5 @@
 .source-token{color:#a7d7ff}
 .panel textarea{min-width:0;width:100%}
 .hosting-log{max-height:25rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.top-link{font-weight:600;font-size:.85rem;white-space:nowrap}
+@media(max-width:700px){.top-link{display:none}}

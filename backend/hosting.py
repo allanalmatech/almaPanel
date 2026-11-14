@@ -252,3 +252,13 @@ def site_security(db, user, account, method, env, body, ip):
                    addresses=body.get('addresses'))
     c.audit(db, user['id'], f'site_security.{action}', host, ip)
     return result
+
+
+def sftp(db, user, account, method, body, ip):
+    if method == 'GET':
+        return c.rpc('sftp.list', name=account['name'])
+    action = allowed(body, {'add', 'remove'})
+    result = c.rpc(f'sftp.{action}', name=account['name'], public_key=body.get('public_key'),
+                   label=body.get('label'), fingerprint=body.get('fingerprint'))
+    c.audit(db, user['id'], f'sftp.{action}', account['id'], ip)
+    return result
