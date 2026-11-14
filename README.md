@@ -79,3 +79,7 @@ Developed and owned by **Alma Tech Labs Inc.**
 
 © 2026 Alma Tech Labs Inc. All Rights Reserved.
 Licensing terms are **pending owner approval**, not implicitly MIT/GPL or another open-source license. See [LICENSE](LICENSE) and [docs/LICENSING.md](docs/LICENSING.md). Original icons, branding and code; no proprietary cPanel assets. Not affiliated with cPanel.
+
+Existing installations can add the alpha.2 update controls with
+`sudo bash installer/enable-updates.sh` from a trusted checkout.
+See [Signed updates](docs/UPDATES.md) for enrolling a key and publishing releases.

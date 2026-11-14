@@ -145,6 +145,7 @@ for unit in /opt/almapanel/services/systemd/*.service; do
      -e "s/^Group=www-data$/Group=$WEB_USER/" "$unit" > "/etc/systemd/system/${unit##*/}"
  chmod 644 "/etc/systemd/system/${unit##*/}"
 done
+install -m 644 /opt/almapanel/services/systemd/almapanel-update.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now almapanel-agent almapanel-api almapanel-worker
 /usr/sbin/nginx -t

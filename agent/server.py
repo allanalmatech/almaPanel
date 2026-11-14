@@ -138,6 +138,11 @@ def account_create(account):
         data[account]['state']='failed';save(data);raise
 
 def dispatch(operation,args):
+    if operation == 'update.trigger':
+        if not Path('/etc/almapanel/update-public.pem').is_file():
+            raise ValueError('Enroll a release verification key on the server first.')
+        run(['/usr/bin/systemctl', '--no-block', 'start', 'almapanel-update.service'])
+        return {'message': 'Update check requested. Refresh status shortly.'}
     if operation=='system.stats':
         import shutil
         mem={k:int(v.split()[0])*1024 for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())}

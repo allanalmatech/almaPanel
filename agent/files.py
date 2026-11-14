@@ -94,6 +94,32 @@ def operate(root, request):
                     err=ctypes.get_errno();raise OSError(err,os.strerror(err))
             finally: os.close(other)
             return {'message':'Renamed.'}
+        if action == 'copy':
+            destination = components(request.get('destination', ''))
+            if not destination:
+                raise ValueError('Destination required.')
+            fd = os.open(leaf, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            with os.fdopen(fd, 'rb') as source:
+                if regular(source.fileno()).st_size > MAX_FILE:
+                    raise ValueError('File exceeds 1 MB.')
+                content = source.read(MAX_FILE + 1)
+                if len(content) > MAX_FILE:
+                    raise ValueError('File exceeds 1 MB.')
+            target = directory(root, destination[:-1])
+            try:
+                output = os.open(destination[-1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                 0o640, dir_fd=target)
+                try:
+                    with os.fdopen(output, 'wb') as file:
+                        file.write(content)
+                        file.flush()
+                        os.fsync(file.fileno())
+                except OSError:
+                    os.unlink(destination[-1], dir_fd=target)
+                    raise
+            finally:
+                os.close(target)
+            return {'message': 'File copied.'}
         if action=='delete':
             s=os.stat(leaf,dir_fd=parent,follow_symlinks=False)
             if stat.S_ISDIR(s.st_mode): os.rmdir(leaf,dir_fd=parent)

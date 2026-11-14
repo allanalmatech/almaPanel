@@ -11,3 +11,9 @@ Private evaluation source delivery; not an approved production release.
 - Complete status documentation; production gate remains closed.
 
 Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of production installation, GitHub publication or public installer availability.
+
+## 0.1.0-alpha.2
+
+- Add GitHub Release update status and immediate checks for administrators.
+- Add signed application updates with a systemd timer and code rollback.
+- Add regular-file copying in File Manager.

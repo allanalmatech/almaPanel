@@ -140,6 +140,18 @@ def api(env, body, db, headers):
     if path == '/api/system' and method == 'GET':
         admin(user)
         return c.rpc('system.stats')
+    if path == '/api/updates':
+        admin(user)
+        if method == 'POST':
+            result = c.rpc('update.trigger')
+            c.audit(db, user['id'], 'update.trigger', 'release channel', ip)
+            return result
+        from pathlib import Path
+        try:
+            status = json.loads(Path('/var/lib/almapanel-update-status/status.json').read_text())
+        except (OSError, ValueError):
+            status = {'state': 'unconfigured', 'message': 'See docs/UPDATES.md to configure the signed release channel.'}
+        return {**status, 'version': (c.ROOT / 'VERSION').read_text().strip()}
     if path == '/api/services' and method == 'POST':
         admin(user)
         if body.get('confirm') != 'RESTART':
@@ -176,7 +188,7 @@ def api(env, body, db, headers):
         if action=='files':
             query=parse_qs(env.get('QUERY_STRING',''))
             args = {'action':'list','path':query.get('path',[''])[0]} if method=='GET' else body
-            allowed = {'list','read','write','mkdir','rename','delete'}
+            allowed = {'list','read','write','mkdir','rename','delete','copy'}
             if args.get('action') not in allowed:
                 raise c.Problem('File operation unavailable.')
             result = c.rpc('files',name=account['name'],request=args)
