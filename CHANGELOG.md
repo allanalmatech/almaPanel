@@ -36,3 +36,9 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Add an optional, separate chrooted SFTP listener and dashboard key controls.
 - Remove SFTP authorization when a hosting account is suspended.
 - Add DNS Track and an account-scoped operation notification inbox.
+
+## 0.1.0-alpha.4 upgrade recovery
+
+- Use the checkout's health check when resuming an interrupted upgrade.
+- Retry the API socket, Nginx HTTPS and agent probes independently. Report
+  the failing endpoint and preserve the rollback snapshot.

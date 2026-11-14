@@ -13,30 +13,39 @@ import sys
 
 source = Path(sys.argv[1])
 sys.path.insert(0, str(source / "installer"))
+import subprocess
 import updater
 
 updater.STATE.mkdir(mode=0o700, exist_ok=True)
 updater.STATUS.mkdir(mode=0o755, exist_ok=True)
 with (updater.STATE / "lock").open("w") as lock:
-    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    updater.recover()
-    installed = (updater.ROOT / "VERSION").read_text().strip()
-    incoming = (source / "VERSION").read_text().strip()
-    if updater.version_key(incoming) < updater.version_key(installed):
-        raise SystemExit("Checkout is older than installed code.")
-    if incoming != installed:
-        updater.apply(source)
-    else:
-        updater.restart_and_verify()
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("Another almaPanel update is running.")
+    try:
+        updater.recover()
+        installed = (updater.ROOT / "VERSION").read_text().strip()
+        incoming = (source / "VERSION").read_text().strip()
+        if updater.version_key(incoming) < updater.version_key(installed):
+            raise SystemExit("Checkout is older than installed code.")
+        if incoming != installed:
+            updater.apply(source)
+        else:
+            updater.restart_and_verify()
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+        raise SystemExit(f"almaPanel update stopped. {error}") from None
 PY
-for helper in updater.py update.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh renew-site-tls.sh; do
- install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
-done
-install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/
-install -d -m 755 /opt/almapanel/services/sftp
-install -m 644 "$SOURCE/services/sftp/sshd_config" /opt/almapanel/services/sftp/
-install -m 644 "$SOURCE/services/systemd/almapanel-sftp.service" /opt/almapanel/services/systemd/
-install -m 644 "$SOURCE/docs/HOSTING.md" /opt/almapanel/docs/HOSTING.md
+if [[ $SOURCE != /opt/almapanel ]]; then
+ for helper in updater.py update.sh healthcheck.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh renew-site-tls.sh; do
+  install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
+ done
+ install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/
+ install -d -m 755 /opt/almapanel/services/sftp
+ install -m 644 "$SOURCE/services/sftp/sshd_config" /opt/almapanel/services/sftp/
+ install -m 644 "$SOURCE/services/systemd/almapanel-sftp.service" /opt/almapanel/services/systemd/
+ install -m 644 "$SOURCE/docs/"{HOSTING,UPDATES}.md /opt/almapanel/docs/
+fi
 sed "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
  "$SOURCE/services/systemd/almapanel-update.service" > /etc/systemd/system/almapanel-update.service
 chmod 644 /etc/systemd/system/almapanel-update.service

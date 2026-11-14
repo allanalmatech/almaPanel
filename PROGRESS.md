@@ -95,3 +95,13 @@ for new SFTP sessions. Also added DNS Track and an in-panel operation inbox.
 Local unit tests and sshd configuration validation passed. The disposable VM
 runner now includes SFTP upload, chroot and revocation acceptance. The live
 Amazon Linux SFTP run is still pending.
+
+### EC2 upgrade recovery
+
+The EC2 checkout reached alpha.4. Recovery on the installed instance stopped
+after Nginx and PHP configuration validation with curl exit code 7. Updated
+the upgrade to use the health check from the checkout, wait for the API socket,
+HTTPS and agent separately, and identify failing endpoints. EC2 verification
+of the recovery is pending. `make check` passed 57 tests, and a local
+health-check harness verified delayed startup and persistent connection
+failure handling. The basic secret scan passed.

@@ -53,3 +53,22 @@ from the reviewed checkout with `installer/enable-updates.sh`. Before rolling
 back to alpha.2, restrict access to the panel. Alpha.2 does not enforce TOTP or
 domain proof, and old site edits cannot preserve all alpha.3 settings.
 Code rollback preserves the database and hosted files.
+
+## Resume after a failed health check
+
+On the EC2 instance, use the updated Git checkout to recover an upgrade
+that stopped with a curl connection error or an `in-progress` marker.
+
+```bash
+cd /home/ec2-user/almaPanel
+git pull --ff-only origin main
+sudo bash installer/enable-updates.sh
+sudo bash installer/healthcheck.sh
+cat /opt/almapanel/VERSION
+```
+
+The upgrade runs the checkout's health check for both the saved version and
+the new application. It waits for each local endpoint to accept connections.
+If it fails again, capture the failing check and the named service journal.
+Keep `/var/lib/almapanel-updater/rollback` and its transaction marker for
+recovery.

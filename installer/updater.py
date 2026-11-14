@@ -14,6 +14,7 @@ import time
 from urllib.request import urlopen
 
 ROOT = Path("/opt/almapanel")
+HEALTHCHECK = Path(__file__).resolve().with_name("healthcheck.sh")
 KEY = Path("/etc/almapanel/update-public.pem")
 STATE = Path("/var/lib/almapanel-updater")
 STATUS = Path("/var/lib/almapanel-update-status")
@@ -95,13 +96,16 @@ def sync_code(source):
 
 def restart_and_verify():
     run("/usr/bin/systemctl", "start", *UNITS)
-    run("/usr/bin/bash", str(ROOT / "installer/healthcheck.sh"))
+    run("/usr/bin/bash", str(HEALTHCHECK))
 
 
 def recover():
     backup = STATE / "rollback"
     if not (STATE / "in-progress").exists():
         return False
+    if not (backup / "VERSION").is_file() or not all((backup / part).is_dir() for part in DIRS):
+        raise RuntimeError("Update recovery needs the application backup in /var/lib/almapanel-updater/rollback.")
+    print("Restoring the saved application files before retrying the update.", flush=True)
     run("/usr/bin/systemctl", "stop", *reversed(UNITS))
     sync_code(backup)
     restart_and_verify()
@@ -125,7 +129,10 @@ def apply(candidate):
         restart_and_verify()
         (STATE / "in-progress").unlink()
     except Exception:
-        recover()
+        try:
+            recover()
+        except Exception as error:
+            raise RuntimeError("Update and recovery checks failed. Review the health check output before retrying.") from error
         raise
 
 
