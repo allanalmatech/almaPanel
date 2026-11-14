@@ -10,6 +10,7 @@ import sqlite3
 import time
 from urllib.parse import parse_qs
 from backend import core as c
+from backend import hosting, schedules, security
 
 MAX_BODY = 1_500_000
 DUMMY_HASH = c.password_hash('dummy-password-for-timing-only')
@@ -60,12 +61,17 @@ def api(env, body, db, headers):
             db.commit()
             token.unlink(missing_ok=True)
             return {'message': 'Administrator created. Sign in.'}
+        db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
         valid = c.password_ok(body.get('password'), row['password'] if row else DUMMY_HASH)
         if not valid or not row or not row['enabled']:
             c.audit(db, None, 'login.failed', username, ip)
             db.commit()
             raise c.Problem('Invalid credentials.', 401)
+        if not security.login_second_factor(db, row['id'], body.get('code')):
+            c.audit(db, row['id'], 'login.mfa_failed', row['id'], ip)
+            db.commit()
+            raise c.Problem('Enter a fresh authenticator or recovery code.', 401)
         raw, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         db.execute('DELETE FROM sessions WHERE expires<?', (int(time.time()),))
         db.execute('INSERT INTO sessions VALUES(?,?,?,?)',
@@ -74,16 +80,34 @@ def api(env, body, db, headers):
         c.audit(db, row['id'], 'login', row['id'], ip)
         headers.append(('Set-Cookie', 'alma_session='+raw+'; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600'))
         return {'csrf': csrf}
-    cookie = SimpleCookie()
-    cookie.load(env.get('HTTP_COOKIE', ''))
-    raw = cookie['alma_session'].value if 'alma_session' in cookie else ''
-    token_hash = hashlib.sha256(raw.encode()).hexdigest()
-    session = db.execute('SELECT * FROM sessions WHERE token=? AND expires>?', (token_hash, int(time.time()))).fetchone()
-    user = db.execute('SELECT * FROM users WHERE id=? AND enabled=1', (session['user_id'],)).fetchone() if session else None
-    if not user:
-        raise c.Problem('Please sign in.', 401)
-    if method == 'POST' and not hmac.compare_digest(env.get('HTTP_X_CSRF_TOKEN',''),session['csrf']):
-        raise c.Problem('Invalid CSRF token.', 403)
+    authorization = env.get('HTTP_AUTHORIZATION')
+    if authorization:
+        user = security.authenticate_token(db, authorization, path, method)
+        session = None
+        token_hash = None
+    else:
+        cookie = SimpleCookie()
+        cookie.load(env.get('HTTP_COOKIE', ''))
+        raw = cookie['alma_session'].value if 'alma_session' in cookie else ''
+        token_hash = hashlib.sha256(raw.encode()).hexdigest()
+        session = db.execute('SELECT * FROM sessions WHERE token=? AND expires>?',
+                             (token_hash, int(time.time()))).fetchone()
+        user = db.execute('SELECT * FROM users WHERE id=? AND enabled=1',
+                          (session['user_id'],)).fetchone() if session else None
+        if not user:
+            raise c.Problem('Please sign in.', 401)
+        if method == 'POST' and not hmac.compare_digest(env.get('HTTP_X_CSRF_TOKEN', ''), session['csrf']):
+            raise c.Problem('Invalid CSRF token.', 403)
+    if path == '/api/mfa':
+        if method == 'POST':
+            throttle(db, 'mfa:' + str(user['id']))
+        return security.mfa(db, user, method, body, ip)
+    if path == '/api/tokens':
+        if method == 'POST' and body.get('action') == 'create':
+            throttle(db, 'token:' + str(user['id']))
+        return security.tokens(db, user, method, body, ip)
+    if path == '/api/profile':
+        return security.profile(db, user, method, body, ip)
     if path == '/api/me' and method == 'GET':
         return {'username': user['username'], 'id': user['id'], 'role': user['role'], 'csrf': session['csrf'], 'last_ip': user['last_ip']}
     if path == '/api/logout' and method == 'POST':
@@ -91,10 +115,12 @@ def api(env, body, db, headers):
         headers.append(('Set-Cookie','alma_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0'))
         return {'message': 'Signed out.'}
     if path == '/api/password' and method == 'POST':
-        if not c.password_ok(body.get('current'), user['password']):
+        db.execute('BEGIN IMMEDIATE')
+        current_hash = db.execute('SELECT password FROM users WHERE id=?', (user['id'],)).fetchone()[0]
+        if not c.password_ok(body.get('current'), current_hash):
             raise c.Problem('Current password is incorrect.',403)
         db.execute('UPDATE users SET password=? WHERE id=?',(c.password_hash(body.get('password')),user['id']))
-        db.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
+        security.toggle_sessions(db, user['id'])
         c.audit(db,user['id'],'password.changed',user['id'],ip)
         return {'message':'Password changed. Sign in again.'}
     if path == '/api/packages':
@@ -173,39 +199,43 @@ def api(env, body, db, headers):
             return c.enqueue(db,user,account['id'],'account.state',{'name':account['name'],'state':state},ip)
         if account['state']!='active':
             raise c.Problem('Account is not active.',409)
-        if action=='domains':
-            if method=='GET':
-                return rows(db.execute('SELECT * FROM domains WHERE account_id=?',(account['id'],)))
-            db.execute('BEGIN IMMEDIATE')
-            limit = db.execute('SELECT max_domains FROM packages WHERE id=?',(account['package_id'],)).fetchone()[0]
-            if db.execute('SELECT count(*) FROM domains WHERE account_id=?',(account['id'],)).fetchone()[0]>=limit:
-                raise c.Problem('Package domain limit reached.',409)
-            host = c.domain(body.get('domain'))
-            db.execute("INSERT INTO domains(account_id,name,state,created) VALUES(?,?,'provisioning',?)",(account['id'],host,int(time.time())))
-            return c.enqueue(db,user,account['id'],'domain.create',{'name':account['name'],'domain':host},ip)
-        if action=='stats' and method=='GET':
-            return c.rpc('account.stats',name=account['name'])
-        if action=='files':
-            query=parse_qs(env.get('QUERY_STRING',''))
-            args = {'action':'list','path':query.get('path',[''])[0]} if method=='GET' else body
-            allowed = {'list','read','write','mkdir','rename','delete','copy','chmod'}
-            if args.get('action') not in allowed:
-                raise c.Problem('File operation unavailable.')
-            result = c.rpc('files',name=account['name'],request=args)
-            if method=='POST' and args['action'] not in ('list','read'):
-                c.audit(db,user['id'],'files.'+args['action'],account['id'],ip)
-            return result
+        if action == 'domains':
+            return hosting.domains(db, user, account, method, body, ip)
+        if action == 'cron':
+            return schedules.php_jobs(db, user, account, method, body, ip)
+        if action == 'backup-schedule':
+            return schedules.settings(db, user, account, method, body, ip)
+        if action == 'stats' and method == 'GET':
+            return c.rpc('account.stats', name=account['name'])
+        if action == 'files':
+            return hosting.files(db, user, account, method, env, body, ip)
+        if action == 'site-security':
+            return hosting.site_security(db, user, account, method, env, body, ip)
+        if action == 'php':
+            return hosting.php(db, user, account, method, env, body, ip)
+        if action == 'tls':
+            return hosting.tls(db, user, account, method, body, ip)
+        if action == 'databases':
+            return hosting.databases(db, user, account, method, body, ip)
+        if action == 'wordpress' and method == 'POST':
+            return hosting.wordpress(db, user, account, body, ip)
+        if action == 'git' and method == 'POST':
+            return hosting.git_release(db, user, account, body, ip)
+        if action == 'metrics' and method == 'GET':
+            return hosting.metrics(db, account, env)
+        if action == 'dns':
+            return hosting.dns(db, user, account, method, env, body, ip)
     raise c.Problem('Endpoint not found.',404)
 
 def application(env, start_response):
     headers=[('Content-Type','application/json'),('Cache-Control','no-store'),('X-Content-Type-Options','nosniff'),
-             ('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
+             ('Content-Security-Policy',"default-src 'self'; style-src 'self'; img-src 'self' blob:; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
              ('Referrer-Policy','no-referrer')]
     status=200
     try:
         path=env.get('PATH_INFO','/')
         if not path.startswith('/api/'):
-            static={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/logo.svg':'logo.svg'}
+            static={'/':'index.html','/app.js':'app.js','/hosting.js':'hosting.js','/style.css':'style.css','/logo.svg':'logo.svg'}
             if path not in static or env['REQUEST_METHOD']!='GET':
                 raise c.Problem('Not found.',404)
             file=c.ROOT/'frontend'/static[path]

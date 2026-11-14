@@ -12,10 +12,10 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Compile Python and check JavaScript
         run: |
-          python3 -m compileall -q backend agent worker scripts tests
-          node --check frontend/app.js
+          python3 -m compileall -q backend agent worker installer scripts tests
+          for script in frontend/*.js; do node --check "$script" || exit; done
       - name: Shell syntax
-        run: find installer -name '*.sh' -exec bash -n {} +
+        run: for script in installer/*.sh; do bash -n "$script" || exit; done
       - name: Reproducible archive
         run: |
           python3 scripts/package.py

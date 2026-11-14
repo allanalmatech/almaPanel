@@ -17,3 +17,16 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Add GitHub Release update status and immediate checks for administrators.
 - Add signed application updates with a systemd timer and code rollback.
 - Add regular-file copying in File Manager.
+
+## 0.1.0-alpha.3
+
+- Add account-scoped MariaDB and PostgreSQL with reset, import and export.
+- Add domain roots, aliases, redirects, TXT proof, forward DNS and site TLS.
+- Add safe ZIP operations, uploads, copying, Trash and scheduled website backups.
+- Add WordPress installation, public Git staging, PHP settings and scheduled
+  PHP scripts.
+- Add TOTP and recovery codes, read-only API tokens, profile details, directory
+  passwords and site IP denial rules.
+- Add website request and PHP log views, process metrics and the Amazon Linux
+  disposable-VM acceptance script.
+- Normalize installed source permissions during code updates.

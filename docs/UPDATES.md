@@ -39,9 +39,17 @@ does not qualify. Installations check every 15 minutes with up to one minute of
 jitter. Administrators can also request an immediate check.
 
 This channel updates only application code with database schema version 1 and
-the existing service layout. Updates to the OS, dependencies, installer, trust
+the existing service layout. The alpha.3 settings tables are additive, and
+installer scripts for optional services are available after upgrading from a
+reviewed checkout. Updates to the OS, dependencies, installer, trust
 key, or database schema require a separate reviewed upgrade. Sign only releases
 that preserve these contracts. On startup or health check failure, the updater
 restores the previous application files. After a power interruption, the next
 check attempts recovery. Review failures with
 `sudo journalctl -u almapanel-update.service -n 50 --no-pager`.
+
+Changes to package setup, installer scripts or systemd should be deployed
+from the reviewed checkout with `installer/enable-updates.sh`. Before rolling
+back to alpha.2, restrict access to the panel. Alpha.2 does not enforce TOTP or
+domain proof, and old site edits cannot preserve all alpha.3 settings.
+Code rollback preserves the database and hosted files.

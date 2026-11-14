@@ -47,3 +47,42 @@ editing using no-follow descriptors. Only 600/640/644/700/750/755 modes are allo
 Symlinks, hardlinked regular files and non-owned entries are rejected.
 Validation: 37 local tests passed plus Python, JavaScript and shell syntax checks.
 Browser and live EC2 permission/ACL behavior still require acceptance.
+
+## 2026-11-14 · 0.1.0-alpha.3
+
+Implemented account-scoped MariaDB and PostgreSQL, per-domain Nginx roots,
+aliases and redirects, tenant DNS proof, BIND forward zones, site certificate
+upload, Certbot issuance and renewal, and WordPress initialization. Added
+bounded ZIP create/extract, recursive copy and search, private Trash, uploads,
+previews, website snapshot and restore, daily/weekly backup schedules and
+tenant SQL transfers. Added public Git source staging, account PHP settings
+and scripts on a schedule, TOTP/recovery codes, read-only tokens, profile
+details, directory passwords, IP denial rules and recent website/process
+metrics. Existing alpha.2 installations can upgrade from the Git checkout.
+
+Verification completed in this workspace:
+
+- 53 Python tests, Python compile, JavaScript and shell syntax checks.
+- Real Chromium over local HTTPS for setup, sign-in, packages, search, profile,
+  API token creation, mobile navigation, theme and logout. The standard
+  Chromium launcher was blocked, so this run used Chromium headless shell.
+- Real MariaDB 11.8 and PostgreSQL 17 over loopback. Create, read/write,
+  ownership denial, size and delete worked for two database owners.
+- Real BIND zone validation and Nginx generated-config validation.
+- Real Nginx HTTPS requests verified directory passwords on static and PHP
+  routes. The test used a temporary self-signed certificate and high ports.
+- Real PHP 8.4 and the pinned WordPress bundle initialized MariaDB tables and
+  the WordPress admin account. The test used loopback SQL transport.
+- Real Git archive staging of a local test commit. Public provider fetch
+  still needs acceptance from the deployment host.
+
+These service checks use local Debian packages and temporary data, so the
+Amazon Linux/Ubuntu installers, systemd, public ACME, DNS delegation, PHP-FPM
+ACL behavior, reboot and signed update failure recovery still need a live VM.
+Run the disposable Amazon Linux acceptance script in tests/installation with
+SQL tests enabled to check the production adapters.
+
+Open modules include mail, FTP/WebDAV, SSH/SFTP, terminal, Node/Python/Ruby
+runtimes, OS quotas, private Git deployment, additional app management, DNSSEC
+and secondary DNS, full-account snapshots, remote backup and migration.
+The detailed status is in FEATURE_MATRIX.md and TODO.md.

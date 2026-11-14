@@ -67,6 +67,10 @@ def initialize():
     with connect() as db:
         db.execute('PRAGMA journal_mode=WAL')
         db.executescript((ROOT / 'database/migrations/001_initial.sql').read_text())
+        from backend import hosting, schedules, security
+        security.setup_tables(db)
+        schedules.setup_tables(db)
+        hosting.domain_table(db)
         if not db.execute('SELECT 1 FROM users').fetchone():
             token = STATE / 'setup-token'
             if not token.exists():
@@ -79,7 +83,10 @@ def audit(db, actor, action, target, ip):
                (actor, action, str(target), ip, int(time.time())))
 
 def rpc(operation, **args):
-    request = json.dumps({'operation': operation, 'args': args}).encode() + b'\n'
+    request = json.dumps({'operation': operation, 'args': args}, ensure_ascii=False,
+                         separators=(',', ':')).encode() + b'\n'
+    if len(request) > 1_600_000:
+        raise Problem('Operation exceeds the agent request limit.', 413)
     try:
         with socket.socket(socket.AF_UNIX) as s:
             s.settimeout(150)

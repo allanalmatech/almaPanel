@@ -34,3 +34,17 @@ Additional required manual/live suites: second-tenant cross-access, concurrent r
 
 ## Packaging and CI
 Run package twice and compare SHA256SUMS. CI checks syntax, tests, basic secret scanning and Bandit. GitHub workflow execution and dependency scanning are not claimed run. Release workflow is intentionally gated; no publishing step exists. Validate CloudFormation through AWS before any deployment. See docs/VALIDATION.md for final local evidence.
+
+
+## Alpha.3 acceptance
+
+Run the Amazon Linux installer and hosting checks on a disposable systemd EC2 VM:
+
+```bash
+sudo env ALMA_DISPOSABLE_VM=YES ALMA_TEST_SQL=YES bash tests/installation/amazon_vm.sh
+```
+
+Omit ALMA_TEST_SQL to run the core and website snapshot checks alone. The script
+creates accounts and starts supported services. Use a clean VM. The local
+test evidence and provider-specific checks that still require a VM are recorded
+in PROGRESS.md.

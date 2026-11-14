@@ -140,7 +140,7 @@ mv "$PHP_POOL/www.conf" /etc/almapanel/package-www.conf.disabled
 sed -e "s@/run/php/@$PHP_RUN/@g" -e "s/^group = nogroup$/group = $(id -gn nobody)/" \
  /opt/almapanel/services/php/idle.conf > "$PHP_POOL/alma-idle.conf"
 echo '[5/7] Installing systemd services'
-for unit in /opt/almapanel/services/systemd/*.service; do
+for unit in /opt/almapanel/services/systemd/almapanel-{agent,api,worker,update}.service; do
  sed -e "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
      -e "s/^Group=www-data$/Group=$WEB_USER/" "$unit" > "/etc/systemd/system/${unit##*/}"
  chmod 644 "/etc/systemd/system/${unit##*/}"

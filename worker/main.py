@@ -4,6 +4,7 @@ import logging
 import signal
 import time
 from backend import core as c
+from backend.schedules import queue_due, setup_tables
 
 def tick():
     with c.connect() as db:
@@ -13,6 +14,13 @@ def tick():
         db.execute("UPDATE jobs SET state='running' WHERE id=?",(row['id'],))
     payload=json.loads(row['payload'])
     try:
+        if row['operation'] == 'cron.run':
+            schedule_id = payload.pop('schedule_id')
+            with c.connect() as db:
+                exists = db.execute('SELECT 1 FROM php_schedules WHERE account_id=? AND id=?',
+                                    (row['account_id'], schedule_id)).fetchone()
+            if not exists:
+                raise c.Problem('The PHP schedule was removed.')
         result=c.rpc(row['operation'],**payload)
         state='succeeded'
     except Exception as e:
@@ -29,6 +37,9 @@ def tick():
             db.execute('DELETE FROM sessions WHERE user_id=(SELECT user_id FROM accounts WHERE id=?)',(row['account_id'],))
         elif row['operation']=='domain.create':
             db.execute('UPDATE domains SET state=? WHERE name=?',('active' if state=='succeeded' else 'failed',payload['domain']))
+        elif row['operation'] == 'domain.remove' and state == 'succeeded':
+            db.execute('DELETE FROM domains WHERE account_id=? AND name=?', (row['account_id'],payload['domain']))
+            db.execute('DELETE FROM domain_proofs WHERE account_id=? AND host=?', (row['account_id'], payload['domain']))
         c.audit(db,row['actor_id'],row['operation']+'.'+state,row['account_id'],'worker')
     return True
 
@@ -36,7 +47,9 @@ def main():
     logging.basicConfig(level=logging.INFO)
     # Never blindly replay non-idempotent operations after an unexpected crash.
     with c.connect() as db:
+        setup_tables(db)
         db.execute("UPDATE jobs SET state='interrupted',result=? WHERE state='running'",(json.dumps({'error':'Worker restarted. Reconcile agent registry before recovery.'}),))
+    next_check = 0.0
     stopping = False
     def stop(signum, frame):
         nonlocal stopping
@@ -45,7 +58,11 @@ def main():
     signal.signal(signal.SIGINT, stop)
     while not stopping:
         try:
-            if not tick(): time.sleep(2)
+            if time.monotonic() >= next_check:
+                queue_due(int(time.time()))
+                next_check = time.monotonic() + 60
+            if not tick():
+                time.sleep(2)
         except Exception:
             logging.exception('Worker error');time.sleep(5)
 

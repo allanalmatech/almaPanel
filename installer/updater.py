@@ -84,9 +84,12 @@ def stage_archive(asset, dest, version):
 
 def sync_code(source):
     for component in DIRS:
-        run("/usr/bin/rsync", "-a", "--delete", str(source / component) + "/", str(ROOT / component) + "/")
+        run("/usr/bin/rsync", "-r", "--perms", "--chmod=D755,F644", "--delete",
+            "--exclude=__pycache__", "--exclude=*.pyc",
+            str(source / component) + "/", str(ROOT / component) + "/")
     tmp = ROOT / ".update-version"
     shutil.copyfile(source / "VERSION", tmp)
+    tmp.chmod(0o644)
     tmp.replace(ROOT / "VERSION")
 
 

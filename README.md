@@ -4,7 +4,7 @@
 
 Linux hosting control panel with an original, compact, grouped-tool interface inspired by familiar hosting workflows.
 
-> **0.1.0-alpha.1 — evaluation only. This is NOT the complete cPanel-equivalent system or a production-certified release.** The source implements a working control-plane core and real Linux operation adapters; EC2/systemd installation has not been executed in this build environment. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) before installation. Unimplemented modules are explicitly listed, never simulated.
+> **0.1.0-alpha.3 — evaluation.** The published source includes database, DNS, site TLS and recovery tools. Live EC2 acceptance for alpha.3 remains pending. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the release gates.
 
 Amazon Linux 2023 is also an evaluation target. See [Amazon Linux 2023 EC2 evaluation](DEPLOYMENT.md#amazon-linux-2023-ec2-evaluation).
 
@@ -41,8 +41,14 @@ Select “First installation? Set up administrator”. There is no default admin
 - Fixed service restart allowlist, job history, failure reporting and restart-interruption handling.
 - Installer/preflight, health checks, non-destructive disablement, control-database snapshot/restore, recovery scripts, deterministic source packaging and gated CI.
 
-## Not included yet
-Mail, hosted MySQL/MariaDB/PostgreSQL, DNS service, automatic site TLS, Git hosting/deployment, WordPress, application runtimes, SSH/SFTP, terminal, cron, full customer-data backups, disk/cgroup quotas, MFA and automatic upgrades are **not implemented**. Do not expose this alpha as a multi-tenant commercial service. [FEATURE_MATRIX.md](FEATURE_MATRIX.md) tracks the requested scope individually.
+## Alpha.3 hosting tools
+The [hosting guide](docs/HOSTING.md) covers upgrades, optional database and DNS
+services, HTTPS, WordPress, backups, Git staging, PHP settings and account
+security. Available services depend on the host configuration.
+
+Mail, FTP/WebDAV, tenant SSH/SFTP, terminal, managed application runtimes,
+enforced OS quotas and full-account backup and migration remain open.
+See [FEATURE_MATRIX.md](FEATURE_MATRIX.md) for partial and completed scope.
 
 ## Development
 ```bash
@@ -52,15 +58,11 @@ python3 scripts/release_gate.py  # intentionally fails until release gates are s
 ```
 Python tests require only Python 3.12 standard library. Production HTTP serving uses Ubuntu's `python3-waitress`. The frontend is directly runnable HTML/CSS/JavaScript; source assets are production-servable without transpilation. Source tarballs are deterministic; APT package versions follow Ubuntu security updates and are recorded on installation, not frozen reproducibly.
 
-## GitHub upload
-```bash
-git init -b main
-git add .
-git commit -m "Initial almaPanel Ubuntu hosting core"
-git remote add origin https://github.com/YOUR_ORG/almapanel.git
-git push -u origin main
-```
-If using the included Git bundle, follow `docs/GITHUB.md` instead. No remote repository has been created or pushed for you. Keep the repository private pending owner licensing approval. The packaging archive is an evaluation artifact, **not an approved public production release**.
+## Source repository
+The project is published at [allanalmatech/almaPanel](https://github.com/allanalmatech/almaPanel).
+For existing installs, use the reviewed checkout and the steps in
+[docs/HOSTING.md](docs/HOSTING.md). Signed release assets and their trust key
+are configured separately.
 
 ## Future public installer
 ```bash
@@ -80,6 +82,6 @@ Developed and owned by **Alma Tech Labs Inc.**
 © 2026 Alma Tech Labs Inc. All Rights Reserved.
 Licensing terms are **pending owner approval**, not implicitly MIT/GPL or another open-source license. See [LICENSE](LICENSE) and [docs/LICENSING.md](docs/LICENSING.md). Original icons, branding and code; no proprietary cPanel assets. Not affiliated with cPanel.
 
-Existing installations can add the alpha.2 update controls with
+Existing installations can apply the latest reviewed checkout with
 `sudo bash installer/enable-updates.sh` from a trusted checkout.
 See [Signed updates](docs/UPDATES.md) for enrolling a key and publishing releases.

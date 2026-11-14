@@ -431,3 +431,34 @@ This section reconciles the user’s alpha.2 checklist. Items remain open until 
 - [ ] isolation/quotas/reboot/recovery
 - [ ] full restore/upgrades/mail/DNS/TLS/performance/security review
 - [ ] reconcile feature matrix/OpenAPI/guides/release checklist
+
+## Alpha.3 implementation and acceptance
+
+This block overrides older status labels for the same work. The consolidated
+18-area checklist above remains the scope. Every partial item still needs its
+remaining behavior and live acceptance before completion.
+
+- [x] Implement ZIP creation and safe extraction, large-file download, folder
+  navigation and search, recursive copy, move, Trash, image preview, source
+  highlighting, and drag-and-drop upload.
+- [x] Implement dedicated per-domain roots, aliases, redirects, primary domain,
+  removal, and DNS TXT verification for tenant claims.
+- [x] Implement local MariaDB/PostgreSQL database provisioning, connection
+  information, password reset, size, deletion and tenant import/export.
+- [x] Implement optional authoritative forward DNS with typed records and JSON
+  import/export, plus Nginx website certificate issuance, upload and renewal.
+- [x] Implement private website backups, schedule, retention and restore to a
+  new folder. Database exports remain separately downloadable.
+- [x] Add WordPress install, public Git staging, per-UID process and recent
+  Nginx/PHP metrics, PHP pool settings, and scheduled PHP scripts.
+- [x] Implement TOTP, recovery codes, read-only API tokens, contact details,
+  directory passwords and website IP denial rules.
+- [ ] Validate the complete alpha.3 upgrade, reboot, tenant ACL protections,
+  optional-service installation, ACME renewal and real DNS on Amazon Linux.
+- [ ] Validate browser layout and keyboard workflows on software that permits
+  Chromium to run. Exercise both administrator and tenant actions.
+- [ ] Finish email, FTP/WebDAV, tenant SSH/SFTP, terminal, application runtimes,
+  resource enforcement, fuller database and WordPress administration,
+  private Git deployment, and full-account backups and migration.
+- [ ] Finish signed GitHub release publication, public installer endpoint,
+  rollback for schema/OS changes, external audit retention and release review.

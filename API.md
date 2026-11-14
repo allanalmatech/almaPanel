@@ -1,7 +1,7 @@
 # API reference
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-Base: `/api`. Machine-readable specification: `docs/openapi.json`. Browser cookie auth only; API tokens are not implemented.
+Base: `/api`. Machine-readable specification: `docs/openapi.json`. Browser cookie auth and scoped read-only bearer tokens.
 
 POST requires `Content-Type: application/json` and exact configured `Origin`. After login every POST also requires `X-CSRF-Token` returned by login or GET /me. Store secure HttpOnly cookie; do not use bearer tokens. Login/setup are per-IP throttled. Sessions last one hour. Queued operations return HTTP 200 with `state=queued`; only a succeeded job proves completion. Job failures are persisted, never transformed into success.
 
@@ -338,3 +338,32 @@ POST /accounts/{id}/files also accepts action chmod, relative path and mode.
 Allowed modes are 600, 640, 644, 700, 750 and 755. Existing account authorization
 and CSRF checks apply. The tenant helper rejects symlinks, non-owned entries
 and hardlinked regular files. Changing permissions can remove Nginx access.
+
+## Alpha.3 hosting routes
+
+The following paths are relative to `/api`. Mutations require the browser’s
+session, correct Origin and CSRF token. `{id}` is an active hosting account the
+caller may administer. Passwords, certificate private keys and supplied SQL
+credentials go directly to the local agent and stay out of job payloads.
+
+| Route | Method | Behavior |
+|---|---|---|
+| `/profile` | GET, POST | Read or save display name and contact email. |
+| `/mfa` | GET, POST | Get status or begin, confirm or disable TOTP. Recovery codes are shown on confirmation only. |
+| `/tokens` | GET, POST | List, create or revoke read-only bearer tokens. The token value is shown once. |
+| `/accounts/{id}/domains` | GET, POST | List or create, edit, remove, select primary, generate DNS proof or verify it. Web changes are queued. |
+| `/accounts/{id}/files` | GET, POST | File Manager with search, copy, move, archive/extract, Trash and website backup operations. |
+| `/accounts/{id}/backup-schedule` | GET, POST | Website snapshots with interval 0, 24 or 168 hours and retain 1–10. |
+| `/accounts/{id}/databases` | GET, POST | List databases and engines, or create, inspect size, reset password, import, export, download, delete export or delete a database. |
+| `/accounts/{id}/tls` | GET, POST | List certificate status and document roots, or issue, upload or toggle HTTPS redirect. |
+| `/accounts/{id}/dns?domain=…` | GET, POST | Administrator-only forward DNS. Save replaces the typed record list. |
+| `/accounts/{id}/site-security?domain=…` | GET, POST | List site protections or set/remove a directory password or save an IP blocklist. |
+| `/accounts/{id}/metrics?domain=…` | GET | Show per-site access sample, or account processes when no domain is provided. |
+| `/accounts/{id}/php` | GET, POST | Read and set pool parameters. GET with `?view=log` returns the error tail. |
+| `/accounts/{id}/git` | POST | Queue public HTTPS source staging to a new folder. |
+| `/accounts/{id}/wordpress` | POST | Install into an HTTPS website using an empty account database. |
+| `/accounts/{id}/cron` | GET, POST | List, create or delete scheduled account PHP scripts. |
+
+API tokens use `Authorization: Bearer <token>`. They permit GET on account
+inventory, domain lists, stats and metrics. Use a session for every operation
+with side effects. See [docs/HOSTING.md](docs/HOSTING.md) for host prerequisites.

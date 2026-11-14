@@ -4,10 +4,10 @@ set -Eeuo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Run as root.' >&2; exit 1; }
 SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source "$SOURCE/installer/platform.sh"
+[[ -f /opt/almapanel/VERSION && -f /var/lib/almapanel/panel.sqlite3 ]] || { echo 'Install almaPanel before upgrading.' >&2; exit 1; }
 # Run only from a reviewed, trusted checkout.
 "$PANEL_PY" - "$SOURCE" <<'PY'
 import fcntl
-import os
 from pathlib import Path
 import sys
 
@@ -26,9 +26,14 @@ with (updater.STATE / "lock").open("w") as lock:
         raise SystemExit("Checkout is older than installed code.")
     if incoming != installed:
         updater.apply(source)
+    else:
+        updater.restart_and_verify()
 PY
-install -m 644 "$SOURCE/installer/updater.py" /opt/almapanel/installer/updater.py
-install -m 644 "$SOURCE/installer/update.sh" /opt/almapanel/installer/update.sh
+for helper in updater.py update.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh renew-site-tls.sh; do
+ install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
+done
+install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/
+install -m 644 "$SOURCE/docs/HOSTING.md" /opt/almapanel/docs/HOSTING.md
 sed "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
  "$SOURCE/services/systemd/almapanel-update.service" > /etc/systemd/system/almapanel-update.service
 chmod 644 /etc/systemd/system/almapanel-update.service

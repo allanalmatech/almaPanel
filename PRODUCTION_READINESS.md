@@ -1,4 +1,9 @@
 # Production readiness report
+
+**Alpha.3 status.** This document’s alpha.1 evidence is historical.
+See [PROGRESS.md](PROGRESS.md) for current tests and
+[FEATURE_MATRIX.md](FEATURE_MATRIX.md) for open release gates.
+
 **Decision: NOT READY FOR PRODUCTION.**
 Version: 0.1.0-alpha.1 · Date: 2026-11-14 · Alma Tech Labs Inc.
 
