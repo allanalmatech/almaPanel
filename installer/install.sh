@@ -3,14 +3,15 @@
 set -Eeuo pipefail
 umask 077
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-ACCEPT=0; PREFLIGHT=0; PUBLIC=0; HOST=localhost
+ACCEPT=0; PREFLIGHT=0; PUBLIC=0; RESUME=0; HOST=localhost
 while (($#)); do
  case "$1" in
  --accept-alpha) ACCEPT=1;;
  --preflight) PREFLIGHT=1;;
+ --resume-identity) RESUME=1;;
  --public-panel) PUBLIC=1;;
  --hostname) [[ $# -ge 2 ]] || exit 2; HOST=$2; shift;;
- --help) echo 'Usage: sudo bash installer/install.sh [--preflight] [--accept-alpha] [--public-panel --hostname panel.example.com]'; exit 0;;
+ --help) echo 'Usage: sudo bash installer/install.sh [--preflight] [--accept-alpha] [--resume-identity] [--public-panel --hostname panel.example.com]'; exit 0;;
  *) echo "Unknown argument: $1" >&2; exit 2;;
  esac
  shift
@@ -28,11 +29,34 @@ case "$(uname -m)" in x86_64|aarch64) ;; *) fail 'Only amd64 and arm64 are targe
 (( ! PUBLIC )) || [[ $HOST != localhost ]] || fail '--public-panel requires a DNS hostname.'
 [[ $(awk '/MemTotal/{print $2}' /proc/meminfo) -ge 900000 ]] || fail 'At least approximately 1 GiB RAM is required. 2 GiB recommended.'
 [[ $(df -Pm / | awk 'NR==2 {print $4}') -ge 5120 ]] || fail 'At least 5 GiB free disk required.'
-for path in /opt/almapanel /etc/almapanel /var/lib/almapanel /var/lib/almapanel-agent /srv/almapanel; do
- [[ ! -e $path ]] || fail "Existing state at $path. Use diagnostics and documented recovery; installation refuses overwrite."
-done
-! getent passwd almapanel >/dev/null || fail 'almapanel system user already exists.'
-for service in nginx apache2 httpd mysql mysqld mariadb postgresql postfix dovecot named bind9 php8.3-fpm php-fpm; do
+if (( RESUME )); then
+ [[ $ID == amzn ]] || fail 'Identity-stage resume is for Amazon Linux 2023.'
+ [[ $(getent passwd almapanel | cut -d: -f6,7) == /var/lib/almapanel:/usr/sbin/nologin ]] ||
+  fail 'Expected almaPanel system identity is missing.'
+ for path in /opt/almapanel /etc/almapanel /var/lib/almapanel /var/lib/almapanel-agent /srv/almapanel /srv/almapanel/accounts /var/backups/almapanel; do
+  [[ -d $path && ! -L $path ]] || fail "Unexpected install directory: $path"
+ done
+ for path in /etc/almapanel /var/lib/almapanel /var/lib/almapanel-agent /srv/almapanel/accounts; do
+  [[ -z $(find "$path" -mindepth 1 -print -quit) ]] || fail "Resume requires empty state at $path."
+ done
+ [[ $(stat -c '%U:%G' /var/lib/almapanel) == almapanel:almapanel ]] || fail 'Unexpected state directory ownership.'
+ [[ -f /var/log/almapanel/install.log && -f /opt/almapanel/venv/pyvenv.cfg ]] || fail 'Partial installation was not found.'
+ for path in /etc/nginx/conf.d/almapanel.conf /etc/nginx/conf.d/almapanel-default.conf "$PHP_POOL/alma-idle.conf" /etc/systemd/system/php-fpm.service.d/almapanel.conf; do
+  [[ ! -e $path && ! -L $path ]] || fail "Resume found configured state at $path."
+ done
+ [[ -f "$PHP_POOL/www.conf" ]] || fail 'Expected package PHP pool is missing.'
+ rpm -q nginx php8.3-fpm python3.12 python3.12-pip >/dev/null || fail 'Required packages are missing.'
+else
+ for path in /opt/almapanel /etc/almapanel /var/lib/almapanel /var/lib/almapanel-agent /srv/almapanel; do
+  [[ ! -e $path && ! -L $path ]] || fail "Existing state at $path. Use diagnostics and documented recovery."
+ done
+ ! getent passwd almapanel >/dev/null || fail 'almapanel system user already exists.'
+fi
+for service in almapanel-api almapanel-agent almapanel-worker nginx apache2 httpd mysql mysqld mariadb postgresql postfix dovecot named bind9 php8.3-fpm php-fpm; do
+ if (( RESUME )) && [[ $service == nginx || $service == php-fpm ]]; then
+  systemctl is-active --quiet "$service.service" && fail "Existing active service $service detected."
+  continue
+ fi
  if systemctl cat "$service.service" >/dev/null 2>&1; then fail "Existing service $service detected. Use a clean VM; migration is not automated."; fi
 done
 for port in 80 443 8443 9080; do
@@ -59,6 +83,7 @@ exec > >(tee -a /var/log/almapanel/install.log) 2>&1
 trap 'rc=$?; echo "Installation failed (exit $rc, line $LINENO). Preserve /var/log/almapanel/install.log. Do not rerun blindly. See docs/TROUBLESHOOTING.md."; exit "$rc"' ERR
 exec 9>/run/almapanel-install.lock
 flock -n 9 || fail 'Another installer is running.'
+if (( ! RESUME )); then
 echo '[1/7] Installing platform packages'
 if [[ $ID == ubuntu ]]; then
  export DEBIAN_FRONTEND=noninteractive
@@ -73,12 +98,20 @@ install -d -m 700 -o almapanel -g almapanel /var/lib/almapanel
 install -d -m 700 /var/lib/almapanel-agent /etc/almapanel /var/backups/almapanel
 install -d -m 711 /srv/almapanel /srv/almapanel/accounts
 install -d -m 755 /opt/almapanel
-rsync -a --exclude=.git --exclude=__pycache__ --exclude=dist --exclude=.coverage --exclude='*.pyc' "$ROOT/" /opt/almapanel/
+fi
+rsync -a --chmod=D755,Fu=rw,Fgo=r --exclude=/venv --exclude=.env --exclude=.git --exclude=__pycache__ --exclude=dist --exclude=.coverage --exclude='*.pyc' "$ROOT/" /opt/almapanel/
+if (( RESUME )); then
+ # The old installer created this root-owned virtual environment under umask 077.
+ chmod -R a+rX,go-w /opt/almapanel/venv
+fi
 chown -R root:root /opt/almapanel
 chmod -R go-w /opt/almapanel
 if [[ $ID == amzn ]]; then
+ (
+ umask 022
  /usr/bin/python3.12 -m venv /opt/almapanel/venv
  "$PANEL_PY" -m pip --isolated install --index-url https://pypi.org/simple --disable-pip-version-check --only-binary=:all: --require-hashes -r /opt/almapanel/installer/requirements-al2023.txt
+ )
 fi
 echo '[3/7] Initializing panel database and one-time setup token'
 runuser -u almapanel -- env PYTHONPATH=/opt/almapanel "$PANEL_PY" -c 'from backend.core import initialize; initialize()'
