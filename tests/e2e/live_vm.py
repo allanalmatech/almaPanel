@@ -130,3 +130,8 @@ if os.environ.get('ALMA_TEST_SFTP') == 'YES':
                                  capture_output=True, timeout=20)
         assert revoked.returncode != 0, 'The revoked key still authenticated'
     print('Live VM SFTP acceptance passed for login, upload, chroot and key revocation.')
+
+
+if os.environ.get('ALMA_TEST_MAIL') == 'YES':
+    from mail_vm import accept
+    accept(call, account_url, os.environ['ALMA_TEST_MAIL_CERT'])

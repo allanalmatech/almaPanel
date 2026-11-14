@@ -976,3 +976,108 @@ function dnsLookupView(epoch) {
         }
     });
 }
+
+async function mailView(epoch) {
+    const base = boundAccount();
+    const path = base + 'mail';
+    const info = await api(path);
+    if (!activeView(epoch, base)) return;
+    const help = 'Manage email addresses for the selected hosting account.';
+    if (!info.available) {
+        view('Email Accounts', help, '<section class="panel"><p>Ask your server administrator to enable Postfix and Dovecot.</p></section>');
+        return;
+    }
+    const domains = await api(base + 'domains');
+    if (!activeView(epoch, base)) return;
+    const inactive = domains.filter(item => item.state === 'active' && item.name !== info.hostname &&
+        !info.domains.includes(item.name) && (me.role === 'admin' || item.dns_verified)).map(item => item.name);
+    const options = hosts => hosts.map(host => `<option value="${esc(host)}">${esc(host)}</option>`).join('');
+    const addressFields = `${field('local', 'Address name', 'text', 'maxlength="64" placeholder="hello"')}
+        <label>Domain<select name="domain">${options(info.domains)}</select></label>`;
+    const passwordField = field('password', 'Mailbox password', 'password', 'minlength="16" maxlength="128" autocomplete="new-password"');
+    const quotaField = value => field('quota_mib', 'Mailbox quota (MiB)', 'number', `min="1" max="512" value="${esc(value)}"`);
+    const mailboxRows = info.mailboxes.map((item, index) => {
+        const actions = item.retired
+            ? `<button class="subtle" data-mail-edit="restore" data-mailbox="${index}">Restore</button>`
+            : `<button class="subtle" data-mail-edit="password" data-mailbox="${index}">Change password</button>
+               <button class="subtle" data-mail-edit="quota" data-mailbox="${index}">Change quota</button>
+               <button class="subtle" data-mail-toggle="${index}">${item.enabled ? 'Disable' : 'Enable'}</button>
+               <button class="subtle" data-mail-archive="${index}">Archive</button>`;
+        const state = item.retired ? 'Archived' : item.enabled ? 'Enabled' : 'Disabled';
+        return [esc(item.address), esc(item.quota_mib + ' MiB'), state, actions];
+    });
+    view('Email Accounts', help, `<section class="panel"><h2>Mail client settings</h2>
+        <dl><dt>Server</dt><dd><code>${esc(info.hostname)}</code></dd>
+        <dt>Incoming</dt><dd>IMAP over TLS, port 993</dd>
+        <dt>Outgoing</dt><dd>SMTP with STARTTLS, port 587</dd>
+        <dt>Username</dt><dd>Full mailbox address</dd></dl>
+        ${info.listen === 'loopback' ? '<p>Mail listeners accept only local connections. An administrator can enable external access.</p>' : ''}
+        </section>
+        <section class="panel"><h2>Local mail routing</h2>
+        ${table(['Domain', 'Action'], info.domains.map((host, index) => [
+            esc(host), `<button class="subtle" data-mail-domain="${index}">Disable local mail</button>`
+        ]))}
+        ${inactive.length ? `<form id="mail-domain"><label>Website domain<select name="domain">
+            ${options(inactive)}</select></label><button type="submit">Enable local mail</button></form>`
+            : '<p>Provision and verify a website domain in Domains to enable mail for it.</p>'}</section>
+        <section class="panel"><h2>Mailboxes</h2>${table(['Address', 'Quota', 'State', 'Actions'], mailboxRows)}
+        <div id="mail-edit"></div>
+        ${info.domains.length ? `<form id="mail-create"><h3>New mailbox</h3>${addressFields}${passwordField}
+            ${quotaField(128)}<button type="submit">Create mailbox</button></form>` : ''}</section>
+        <section class="panel"><h2>Forwarders</h2>
+        ${table(['Address', 'Destination', 'Action'], info.forwarders.map((item, index) => [
+            esc(item.source), esc(item.target), `<button class="subtle" data-mail-forward="${index}">Remove</button>`
+        ]))}
+        ${info.domains.length ? `<form id="mail-forward"><h3>New or existing forwarder</h3>${addressFields}
+            ${field('target', 'Destination address', 'email', 'maxlength="254"')}
+            <button type="submit">Save forwarder</button></form>` : ''}</section>`);
+
+    async function update(fields) {
+        const result = await api(path, fields);
+        if (!activeView(epoch, base)) return;
+        notice(result.message);
+        await stats();
+        if (activeView(epoch, base)) await route();
+    }
+    if (inactive.length) form('#mail-domain', fields => update({action: 'domain', domain: fields.domain, enabled: true}));
+    if (info.domains.length) {
+        form('#mail-create', fields => update({action: 'create', address: fields.local + '@' + fields.domain,
+            password: fields.password, quota_mib: Number(fields.quota_mib)}));
+        form('#mail-forward', fields => update({action: 'forward', address: fields.local + '@' + fields.domain,
+            target: fields.target}));
+    }
+    const scope = $('#main');
+    actionHandler(scope, '[data-mail-domain]', async button => {
+        const domain = info.domains[Number(button.dataset.mailDomain)];
+        if (await confirmed(`Disable local mail for ${domain}?`)) await update({action: 'domain', domain, enabled: false});
+    });
+    actionHandler(scope, '[data-mail-edit]', button => {
+        const item = info.mailboxes[Number(button.dataset.mailbox)];
+        const action = button.dataset.mailEdit;
+        const editingQuota = action === 'quota';
+        const label = {password: 'Change password for', quota: 'Change quota for', restore: 'Restore'};
+        $('#mail-edit').innerHTML = `<form id="mail-edit-form"><h3>${label[action]} ${esc(item.address)}</h3>
+            ${editingQuota ? quotaField(item.quota_mib) : passwordField}<button type="submit">Save</button></form>`;
+        form('#mail-edit-form', fields => update({action, address: item.address,
+            ...(editingQuota ? {quota_mib: Number(fields.quota_mib)} : {password: fields.password})}));
+        $('#mail-edit-form input').focus();
+    });
+    actionHandler(scope, '[data-mail-toggle]', async button => {
+        const item = info.mailboxes[Number(button.dataset.mailToggle)];
+        if (await confirmed(`${item.enabled ? 'Disable' : 'Enable'} login and delivery for ${item.address}?`)) {
+            await update({action: 'state', address: item.address, enabled: !item.enabled});
+        }
+    });
+    actionHandler(scope, '[data-mail-archive]', async button => {
+        const item = info.mailboxes[Number(button.dataset.mailArchive)];
+        if (await confirmed(`Archive ${item.address}? Existing messages stay on disk. New mail and logins will be denied.`)) {
+            await update({action: 'retire', address: item.address, confirm: item.address});
+        }
+    });
+    actionHandler(scope, '[data-mail-forward]', async button => {
+        const item = info.forwarders[Number(button.dataset.mailForward)];
+        if (await confirmed(`Remove the forwarder for ${item.source}?`)) {
+            await update({action: 'unforward', address: item.source});
+        }
+    });
+}

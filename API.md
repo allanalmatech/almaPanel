@@ -377,3 +377,28 @@ with side effects. See [docs/HOSTING.md](docs/HOSTING.md) for host prerequisites
   the server’s public DNS resolver. The session is rate limited.
 - `GET /notifications` lists up to 40 completed, failed or interrupted
   jobs in the caller’s role scope. POST accepts the job `id` to dismiss.
+
+## Email Accounts
+
+An active hosting account and a scoped panel session are required. POST
+also requires the panel Origin and CSRF token.
+
+- `GET /accounts/{id}/mail` returns the service availability, mail hostname,
+  listener mode, enabled domains, mailbox metadata and forwarders.
+- `POST /accounts/{id}/mail` accepts these actions.
+
+| Action | Required fields |
+| --- | --- |
+| `domain` | `domain` and boolean `enabled`. The domain must belong to the account. Account users and resellers must verify ownership before enabling routing. |
+| `create` | `address`, `password`, and integer `quota_mib` between 1 and 512. |
+| `password`, `restore` | `address` and a new `password`. |
+| `quota` | `address` and `quota_mib`. |
+| `state` | `address` and boolean `enabled`. |
+| `retire` | `address` and matching `confirm`. |
+| `forward` | Source `address` and destination `target`. |
+| `unforward` | Source `address`. |
+
+The agent applies settings synchronously. Success returns `{"message":"Mail configuration saved."}`.
+Unauthenticated calls get 401. An account or domain outside the caller's
+scope returns 404. A suspended account or missing domain proof returns 409.
+Agent-side validation and service errors return 502.

@@ -101,7 +101,29 @@ Amazon Linux SFTP run is still pending.
 The EC2 checkout reached alpha.4. Recovery on the installed instance stopped
 after Nginx and PHP configuration validation with curl exit code 7. Updated
 the upgrade to use the health check from the checkout, wait for the API socket,
-HTTPS and agent separately, and identify failing endpoints. EC2 verification
-of the recovery is pending. `make check` passed 57 tests, and a local
-health-check harness verified delayed startup and persistent connection
+HTTPS and agent separately, and identify failing endpoints. The operator
+confirmed the retry worked on their EC2 instance. `make check` passed 57
+tests. A local harness verified delayed startup and persistent connection
 failure handling. The basic secret scan passed.
+
+## 2026-11-14 · 0.1.0-alpha.5
+
+Added Email Accounts and local routing for assigned domains. The optional
+installer configures Postfix SMTP, authenticated TLS submission and Dovecot
+IMAP/LMTP for virtual mailboxes with per-mailbox quotas. Mail starts in
+loopback mode. Mailbox password changes, archive and restore, forwarding and
+new-session denial on account suspension are implemented.
+
+- `make check` passed 62 tests and Python, JavaScript and shell syntax.
+- Chromium passed the panel browser checks, including creating a mailbox
+  through a test API fixture. That check verified the form and request.
+- Dovecot 2.3 and Postfix 3.7 parsed local generated configuration. Postfix
+  read generated recipient and sender maps using a loopback adapter for
+  interface enumeration in the workspace.
+- The basic secret scan, OpenAPI validation and Bandit at the CI threshold passed.
+
+The disposable Amazon Linux runner now includes SMTP relay denial, authenticated
+submission, local forwarding, IMAP quota enforcement and archive access checks.
+It still needs a live VM run. Public mail DNS, TLS certificate renewal, EC2
+outbound delivery, DKIM/SPF/DMARC, spam filtering, webmail, logs and mail recovery
+remain open. The production release gate remains closed.

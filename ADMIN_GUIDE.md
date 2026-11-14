@@ -12,4 +12,10 @@ Complete DEPLOYMENT.md first, using a disposable EC2 VM. Claim the initial admin
 7. Review audit and job logs. Browser audit is bounded to 200 recent rows, jobs to 100. Failed/interrupted jobs require system journal and root-registry reconciliation; never flip a failed row to active without checking Linux resources.
 8. Back up and restore the control database using the explicit scripts in DEPLOYMENT.md. These do not back up websites or reconstruct Linux identities. Full VM snapshots are needed for current evaluation recovery.
 
-No account termination, server network modification, arbitrary root terminal, automatic upgrades, reset-password workflow, administrator CRUD, mail configuration or package resource enforcement is implemented. Use the feature matrix and release checklist to plan changes, not undocumented manual mutations. Every administrative OS change should be tested on a clone first.
+9. For optional mail hosting, follow the [Postfix and Dovecot setup guide](docs/MAIL.md).
+   Check relay denial, mailbox authentication and local delivery before opening
+   external access. For the software update channel, see [Signed updates](docs/UPDATES.md).
+
+The [feature matrix](FEATURE_MATRIX.md) and [release checklist](RELEASE_CHECKLIST.md)
+track account termination, network management, administrator permissions,
+resource enforcement and the remaining deployment tests.

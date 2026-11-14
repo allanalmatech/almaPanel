@@ -42,3 +42,12 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Use the checkout's health check when resuming an interrupted upgrade.
 - Retry the API socket, Nginx HTTPS and agent probes independently. Report
   the failing endpoint and preserve the rollback snapshot.
+
+## 0.1.0-alpha.5
+
+- Add optional SMTP and IMAP on Postfix and Dovecot. Mail listens locally
+  by default, with explicit opt-in for public IPv4 listeners.
+- Add account-scoped aliases, mail routing, mailbox provisioning, password
+  resets, quotas, archiving and restoration.
+- Add tests for tenant scope, relay denial, TLS authentication, LMTP delivery,
+  quota checks and archived mailbox login denial.

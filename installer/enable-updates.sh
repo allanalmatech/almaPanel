@@ -37,14 +37,15 @@ with (updater.STATE / "lock").open("w") as lock:
         raise SystemExit(f"almaPanel update stopped. {error}") from None
 PY
 if [[ $SOURCE != /opt/almapanel ]]; then
- for helper in updater.py update.sh healthcheck.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh renew-site-tls.sh; do
+ for helper in updater.py update.sh healthcheck.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh enable-mail.sh renew-site-tls.sh; do
   install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
  done
  install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/
- install -d -m 755 /opt/almapanel/services/sftp
+ install -d -m 755 /opt/almapanel/services/sftp /opt/almapanel/services/mail
  install -m 644 "$SOURCE/services/sftp/sshd_config" /opt/almapanel/services/sftp/
  install -m 644 "$SOURCE/services/systemd/almapanel-sftp.service" /opt/almapanel/services/systemd/
- install -m 644 "$SOURCE/docs/"{HOSTING,UPDATES}.md /opt/almapanel/docs/
+ install -m 644 "$SOURCE/services/mail/"{dovecot-alma,postfix-main,postfix-submission}.conf /opt/almapanel/services/mail/
+ install -m 644 "$SOURCE/docs/"{HOSTING,MAIL,UPDATES}.md /opt/almapanel/docs/
 fi
 sed "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \
  "$SOURCE/services/systemd/almapanel-update.service" > /etc/systemd/system/almapanel-update.service

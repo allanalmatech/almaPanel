@@ -262,3 +262,20 @@ def sftp(db, user, account, method, body, ip):
                    label=body.get('label'), fingerprint=body.get('fingerprint'))
     c.audit(db, user['id'], f'sftp.{action}', account['id'], ip)
     return result
+
+
+def mail(db, user, account, method, body, ip):
+    if method == 'GET':
+        return c.rpc('mail.list', name=account['name'])
+    action = allowed(body, {'domain', 'create', 'password', 'quota', 'state', 'retire', 'restore',
+                            'forward', 'unforward'})
+    if action == 'domain':
+        host = c.domain(body.get('domain'))
+        find_domain(db, account, host)
+        if body.get('enabled') is True:
+            require_domain_proof(db, user, account, host)
+    fields = {key: body.get(key) for key in ('domain', 'address', 'target', 'password', 'quota_mib',
+                                            'enabled', 'confirm')}
+    result = c.rpc(f'mail.{action}', name=account['name'], **fields)
+    c.audit(db, user['id'], f'mail.{action}', account['id'], ip)
+    return result

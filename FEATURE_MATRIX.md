@@ -56,9 +56,9 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | DNS import/export | Domains | Partial | JSON record list | Typed DNS case tests | Ubuntu 24.04 / AL2023 | BIND master-file imports remain open |
 | Domain verification | Domains | Implemented locally | DNS TXT proof before tenant claim | Local WSGI authorization tests | Ubuntu 24.04 / AL2023 | Requires dig and public DNS |
 | Document roots | Domains | Implemented locally | Validated paths inside tenant public_html | Real Nginx config validation | Ubuntu 24.04 / AL2023 | Public VM tests pending |
-| Email Accounts | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Forwarders | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Email Routing | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
+| Email Accounts | Email | Partial | Dovecot virtual mailboxes with password resets, quotas, archive and restore | Local API, map and config tests | Ubuntu 24.04 / AL2023 target | Live login, quota, delivery and certificate renewal pending |
+| Forwarders | Email | Partial | Postfix aliases with loop and address validation | Local API, map and config tests | Ubuntu 24.04 / AL2023 target | Live alias delivery and public forwarding acceptance pending |
+| Email Routing | Email | Partial | Enable or disable local mail for assigned domains | Local tenant scope and configuration tests | Ubuntu 24.04 / AL2023 target | Remote MX routing and automation pending |
 | Autoresponders | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Default Address | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Mailing Lists | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
@@ -72,7 +72,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Calendars and Contacts | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Webmail | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Mailbox migration | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Postfix Dovecot Rspamd integration | Email | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
+| Postfix Dovecot Rspamd integration | Email | Partial | Postfix SMTP, Dovecot SASL, LMTP and IMAP | Dovecot/Postfix config parsed locally | Ubuntu 24.04 / AL2023 target | Real service delivery acceptance and Rspamd pending |
 | Visitors | Metrics | Partial | Recent Nginx request sample | Local Nginx validation | Ubuntu 24.04 / AL2023 | No visitor analytics or long-term aggregates |
 | Errors | Metrics | Partial | Nginx response statuses and PHP-FPM log tail | Local renderer tests | Ubuntu 24.04 / AL2023 | No centralized log aggregation |
 | Bandwidth | Metrics | Partial | Recent byte counts from managed Nginx log | Local renderer tests | Ubuntu 24.04 / AL2023 | No monthly quota or billing meter |

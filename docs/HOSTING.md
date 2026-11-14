@@ -152,3 +152,9 @@ script checks upload, chroot isolation and revocation.
 
 **DNS Track** shows public records via the server’s resolver.
 **Notifications** shows completed and failed operations within your role’s scope.
+
+## Email hosting
+
+Administrators can set up Postfix and Dovecot where no mail server is already
+configured. Users manage their own mailboxes and forwarders in **Email Accounts**.
+The [mail setup guide](MAIL.md) covers TLS, DNS, loopback testing and external access.

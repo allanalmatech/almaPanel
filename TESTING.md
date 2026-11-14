@@ -48,3 +48,18 @@ Omit ALMA_TEST_SQL to run the core and website snapshot checks alone. The script
 creates accounts and starts supported services. Use a clean VM. The local
 test evidence and provider-specific checks that still require a VM are recorded
 in PROGRESS.md.
+
+## Alpha.5 mail acceptance
+
+On a clean disposable Amazon Linux 2023 VM:
+
+```bash
+sudo env ALMA_DISPOSABLE_VM=YES ALMA_TEST_MAIL=YES bash tests/installation/amazon_vm.sh
+```
+
+The runner configures loopback Postfix and Dovecot with a short-lived test
+certificate and checks SMTP authentication and relay denial, forwarding through
+LMTP, IMAP quota enforcement, and archived mailbox access. Locally, generated
+configurations and Postfix maps passed parser checks. The Chromium test covers
+form submission using a fixture. Real mail delivery, public DNS and renewal
+need service acceptance on the VM.

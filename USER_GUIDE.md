@@ -9,4 +9,11 @@ Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 6. **Disk Usage** retrieves actual directory bytes. CPU/RAM/bandwidth are explicitly unavailable at account level; no invented bars or quotas are shown.
 7. **Password & Security** requires the current password and a new 14–128-character password; all sessions are invalidated. Sign in again. Log out when done; sessions expire after one hour.
 
-Suspended accounts cannot log in. Failed jobs should be reported to the administrator with job ID, not with credentials. Use **Feature Availability** for unavailable modules; there are no functioning email/database/Git/SSL tools in this alpha. Support: https://almatechconsults.com · almatechuganda@gmail.com · +256 700 868 939.
+8. **Email Accounts** manages mailboxes and forwarders when the administrator
+   has enabled Postfix and Dovecot. Create a mailbox for a verified domain
+   and use its full address, password and the displayed connection settings
+   in your email client. See the [mail guide](docs/MAIL.md).
+
+Suspended accounts cannot log in to the panel. Report failed jobs with the
+job ID and keep credentials private. Use **Feature Availability** to check
+which hosting tools are available. Support information is under **Support & About**.

@@ -55,15 +55,18 @@ def render(host, site, identifier):
 def password_line(username, password, run):
     if not isinstance(username, str) or not BASIC_USER.fullmatch(username):
         raise ValueError('Use a site username of 3–32 letters, digits, underscores or hyphens.')
+    return f'{username}:{password_hash(password, run)}\n'
+
+
+def password_hash(password, run):
     if (not isinstance(password, str) or len(password.encode()) > 128 or len(password) < 16
             or any(ord(char) < 32 for char in password)):
         raise ValueError('Use a 16–128 byte password without control characters.')
-    # Feed the password through stdin. OpenSSL's SHA512-crypt is accepted by
-    # Nginx's crypt() password-file implementation on the supported systems.
+    # SHA512-crypt works with Nginx auth_basic and Dovecot passwd-file.
     digest = run(['/usr/bin/openssl', 'passwd', '-6', '-stdin'], input=password + '\n').strip()
-    if not digest.startswith('$6$') or '\n' in digest:
-        raise ValueError('Could not prepare the directory password.')
-    return username + ':' + digest + '\n'
+    if not re.fullmatch(r'\$6\$[A-Za-z0-9./]+\$[A-Za-z0-9./]{86}', digest):
+        raise ValueError('Could not prepare the password.')
+    return digest
 
 
 def networks(values):

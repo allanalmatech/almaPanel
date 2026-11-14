@@ -49,6 +49,30 @@ with tempfile.TemporaryDirectory() as temp:
             page.locator('#package-form input[name=max_domains]').fill('3')
             page.get_by_role('button',name='Create package',exact=True).click()
             page.get_by_role('cell',name='Browser package',exact=True).wait_for()
+            with c.connect() as db:
+                actor = db.execute("SELECT id FROM users WHERE username='browseradmin'").fetchone()[0]
+                package = db.execute("SELECT id FROM packages WHERE name='Browser package'").fetchone()[0]
+                db.execute("""INSERT INTO accounts(user_id,name,owner_id,package_id,state,created)
+                              VALUES(?, 'browserhost', ?, ?, 'active', 0)""", (actor, actor, package))
+            def browser_mail(route):
+                if route.request.method == 'GET':
+                    route.fulfill(json={'available': True, 'hostname': 'mail.example.com', 'listen': 'loopback',
+                                        'domains': ['example.com'], 'mailboxes': [], 'forwarders': []})
+                else:
+                    body = route.request.post_data_json
+                    assert body['action'] == 'create' and body['address'] == 'hello@example.com'
+                    assert body['quota_mib'] == 32
+                    route.fulfill(json={'message': 'Mail configuration saved.'})
+            page.route('**/api/accounts/*/mail', browser_mail)
+            page.reload()
+            page.locator('#nav a[href="#mail"]').click()
+            page.get_by_role('heading',name='Email Accounts').wait_for()
+            page.get_by_text('Mail listeners accept only local connections.',exact=False).wait_for()
+            page.locator('#mail-create [name=local]').fill('hello')
+            page.locator('#mail-create [name=password]').fill(password)
+            page.locator('#mail-create [name=quota_mib]').fill('32')
+            page.get_by_role('button',name='Create mailbox',exact=True).click()
+            page.get_by_text('Mail configuration saved.',exact=True).wait_for()
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.locator('#search').fill('file manager')
             page.locator('.tool[href="#files"]').wait_for()
@@ -82,6 +106,6 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('heading',name='Sign in to your account').wait_for()
             assert not errors, errors
             browser.close()
-            print('Browser acceptance passed: setup, login, packages, search, profile, API tokens, theme, mobile navigation and logout; no page errors.')
+            print('Browser acceptance passed for setup, login, packages, mail form, search, profile, API tokens, theme, navigation and logout.')
     finally:
         server.shutdown();thread.join();os.environ.pop('ALMA_ORIGIN',None)

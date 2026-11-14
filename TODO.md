@@ -16,7 +16,7 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [ ] Extend file manager safely with requested advanced operations.
 
 ## Milestone 3 — Hosting services
-- [ ] Mail, ACME renewal, SFTP/SSH, cron, Git, application hosting.
+- [~] Mail, ACME renewal, SFTP/SSH, cron, Git, application hosting.
 
 ## Milestone 4 — Advanced hosting
 - [~] Reseller account allocation and domain-count packages.
@@ -100,9 +100,9 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [~] Document roots
 
 ### Email
-- [ ] Email Accounts
-- [ ] Forwarders
-- [ ] Email Routing
+- [~] Email Accounts with mailbox quotas, archives and password resets. Live acceptance pending.
+- [~] Forwarders with alias loop validation. Live acceptance pending.
+- [~] Local mail routing for assigned domains. Remote routing remains open.
 - [ ] Autoresponders
 - [ ] Default Address
 - [ ] Mailing Lists
@@ -116,7 +116,8 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [ ] Calendars and Contacts
 - [ ] Webmail
 - [ ] Mailbox migration
-- [ ] Postfix Dovecot Rspamd integration
+- [~] Postfix and Dovecot setup. Validate local SMTP/IMAP and public delivery on the target host.
+- [ ] Rspamd spam filtering and mail signing.
 
 ### Metrics
 - [ ] Visitors
@@ -309,20 +310,20 @@ This section reconciles the user’s alpha.2 checklist. Items remain open until 
 
 ### Email
 
-- [ ] Mailbox CRUD/passwords/quotas
-- [ ] SMTP/IMAP
+- [~] Mailbox provisioning, quotas, password resets, archive and restore. Live quota acceptance pending.
+- [~] TLS-protected SMTP submission and IMAP. Live service acceptance pending.
 - [ ] webmail
-- [ ] forwarding/aliases/autoresponders/catch-all
-- [ ] routing/lists/import
+- [~] Forwarding and aliases. Autoresponders and catch-all remain open.
+- [~] Local mail routing. Remote routing, mailing lists and imports remain open.
 - [ ] global and mailbox filters
 - [ ] spam
 - [ ] encryption
 - [ ] calendars/contacts
 - [ ] tracking/logs/queues
 - [ ] DKIM/SPF/DMARC
-- [ ] TLS
+- [~] Mail TLS certificates and manual refresh. Automated renewal verification remains open.
 - [ ] backups/migration
-- [ ] Postfix/Dovecot/Rspamd/Roundcube
+- [~] Postfix and Dovecot configuration. Rspamd and Roundcube remain open.
 
 ### Site SSL/TLS
 

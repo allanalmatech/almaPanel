@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.4",
+    "version": "0.1.0-alpha.5",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -5149,6 +5149,126 @@
           },
           "default": {
             "description": "Request rejected"
+          }
+        }
+      }
+    },
+    "/accounts/{id}/mail": {
+      "get": {
+        "summary": "Read an account\u2019s mail service, domains, mailboxes, and forwarding settings",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation result"
+          },
+          "default": {
+            "description": "Request rejected"
+          }
+        }
+      },
+      "post": {
+        "summary": "Update an account\u2019s mailbox, local mail routing, or forwarders",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation result"
+          },
+          "default": {
+            "description": "Request rejected"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "domain",
+                      "create",
+                      "password",
+                      "quota",
+                      "state",
+                      "retire",
+                      "restore",
+                      "forward",
+                      "unforward"
+                    ]
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "target": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "writeOnly": true
+                  },
+                  "quota_mib": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "confirm": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
           }
         }
       }

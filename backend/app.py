@@ -216,6 +216,8 @@ def api(env, body, db, headers):
             return c.rpc('account.stats', name=account['name'])
         if action == 'files':
             return hosting.files(db, user, account, method, env, body, ip)
+        if action == 'mail':
+            return hosting.mail(db, user, account, method, body, ip)
         if action == 'sftp':
             return hosting.sftp(db, user, account, method, body, ip)
         if action == 'site-security':

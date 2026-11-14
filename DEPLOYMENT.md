@@ -90,7 +90,10 @@ The bootstrap refuses a missing/invalid archive digest and verifies downloaded b
 - EC2 port 25 restrictions: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html
 - Waitress proxy trust: https://docs.pylonsproject.org/projects/waitress/en/stable/reverse-proxy.html
 
-AWS Free Tier benefits depend on account creation date and usage. EC2 blocks outbound public port 25 by default, so a future mail module needs appropriate infrastructure/approval or an authenticated relay. These are not bypassed by installing almaPanel.
+AWS Free Tier benefits depend on account creation date and usage. The optional
+Postfix and Dovecot stack binds to loopback by default. Direct delivery from EC2
+requires removal of the outbound port 25 restriction. Follow the
+[mail setup guide](docs/MAIL.md) for certificate and DNS requirements.
 
 ## Amazon Linux 2023 EC2 evaluation
 
