@@ -1,0 +1,334 @@
+# API reference
+Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
+
+Base: `/api`. Machine-readable specification: `docs/openapi.json`. Browser cookie auth only; API tokens are not implemented.
+
+POST requires `Content-Type: application/json` and exact configured `Origin`. After login every POST also requires `X-CSRF-Token` returned by login or GET /me. Store secure HttpOnly cookie; do not use bearer tokens. Login/setup are per-IP throttled. Sessions last one hour. Queued operations return HTTP 200 with `state=queued`; only a succeeded job proves completion. Job failures are persisted, never transformed into success.
+
+Errors use `{"error":"message"}`: 400 invalid input; 401 sign-in required; 403 role/CSRF/origin/token rejection; 404 missing or unauthorized resource; 405 method rejected; 409 uniqueness/allocation/state conflict; 413 body >1,500,000 bytes; 415 wrong content type; 429 throttled; 500 internal error; 502 agent operation failure; 503 agent unavailable. HTTP GET does not mutate resources. Unsupported endpoints return 404.
+
+## GET `/health`
+Check database/API health. Permissions: **Public**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "status": "ok",
+  "version": "0.1.0-alpha.1"
+}
+```
+
+## POST `/setup`
+Create first administrator. Permissions: **Public + one-time setup token**.
+
+Request:
+```json
+{
+  "username": "admin",
+  "password": "CHOOSE-AT-LEAST-14-CHARACTERS",
+  "token": "TOKEN-FROM-SERVER"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "Administrator created. Sign in."
+}
+```
+
+## POST `/login`
+Create secure one-hour session. Permissions: **Public, rate-limited**.
+
+Request:
+```json
+{
+  "username": "admin",
+  "password": "YOUR-PASSWORD"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "csrf": "TOKEN"
+}
+```
+
+## GET `/me`
+Read own identity and CSRF token. Permissions: **Authenticated**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "id": 1,
+  "username": "admin",
+  "role": "admin",
+  "csrf": "TOKEN",
+  "last_ip": "203.0.113.7"
+}
+```
+
+## POST `/logout`
+Revoke current session. Permissions: **Authenticated**.
+
+Request:
+```json
+{}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "Signed out."
+}
+```
+
+## POST `/password`
+Change password, revoke all sessions. Permissions: **Authenticated + current password**.
+
+Request:
+```json
+{
+  "current": "OLD-PASSWORD",
+  "password": "NEW-LONG-PASSWORD"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "Password changed. Sign in again."
+}
+```
+
+## GET `/packages`
+List global/owned packages. Permissions: **Authenticated, scoped**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[
+  {
+    "id": 1,
+    "name": "Small",
+    "owner_id": null,
+    "max_domains": 3
+  }
+]
+```
+
+## POST `/packages`
+Create package. Permissions: **Admin or reseller**.
+
+Request:
+```json
+{
+  "name": "Small",
+  "max_domains": 3
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "Package created. Only domain-count limits are enforced in this release."
+}
+```
+
+## GET `/resellers`
+List resellers. Permissions: **Admin**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## POST `/resellers`
+Create reseller login/allocation. Permissions: **Admin**.
+
+Request:
+```json
+{
+  "username": "reseller",
+  "password": "CHOOSE-LONG-PASSWORD",
+  "max_accounts": 5
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "Reseller created."
+}
+```
+
+## GET `/accounts`
+List authorized hosting accounts. Permissions: **Authenticated, scoped**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## POST `/accounts`
+Queue Linux hosting account. Permissions: **Admin or reseller within allocation**.
+
+Request:
+```json
+{
+  "username": "customer",
+  "password": "CHOOSE-LONG-PASSWORD",
+  "package_id": 1
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "job_id": 1,
+  "state": "queued"
+}
+```
+
+## GET `/jobs`
+List 100 latest authorized jobs. Permissions: **Admin all; otherwise own actor**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## GET `/audit`
+List 200 latest audit events. Permissions: **Admin**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## GET `/system`
+Read live Linux statistics. Permissions: **Admin**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "load_average": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "memory_total": 0,
+  "memory_available": 0,
+  "disk_total": 0,
+  "disk_used": 0,
+  "services": {},
+  "hostname": "server"
+}
+```
+
+## POST `/services`
+Queue allowlisted restart. Permissions: **Admin + RESTART confirmation**.
+
+Request:
+```json
+{
+  "service": "nginx",
+  "confirm": "RESTART"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "job_id": 2,
+  "state": "queued"
+}
+```
+
+## POST `/accounts/{id}/state`
+Queue active/suspended state. Permissions: **Admin or owning reseller**.
+
+Request:
+```json
+{
+  "state": "suspended"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "job_id": 3,
+  "state": "queued"
+}
+```
+
+## GET `/accounts/{id}/domains`
+List domains. Permissions: **Authorized active account**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## POST `/accounts/{id}/domains`
+Queue HTTP virtual host. Permissions: **Authorized active account within package**.
+
+Request:
+```json
+{
+  "domain": "example.com"
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "job_id": 4,
+  "state": "queued"
+}
+```
+
+## GET `/accounts/{id}/stats`
+Read real account disk size. Permissions: **Authorized active account**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "home": "/srv/almapanel/accounts/customer",
+  "disk_bytes": 0,
+  "domains": 0,
+  "disk_quota_bytes": null,
+  "cpu_percent": null,
+  "memory_bytes": null,
+  "bandwidth_bytes": null,
+  "quota_note": "Disk/CPU/RAM quotas are not enforced in this alpha."
+}
+```
+
+## GET `/accounts/{id}/files`
+List directory; optional ?path=relative/path. Permissions: **Authorized active account**.
+
+Response shape/example (illustrative, not live measurements):
+```json
+[]
+```
+
+## POST `/accounts/{id}/files`
+Operate on files under tenant UID. Permissions: **Authorized active account**.
+
+Request:
+```json
+{
+  "action": "write",
+  "path": "index.html",
+  "content": "SGVsbG8="
+}
+```
+Response shape/example (illustrative, not live measurements):
+```json
+{
+  "message": "File saved."
+}
+```
+
+## File operation variants
+All paths are relative to public_html. `GET files?path=folder` lists up to 5000 entries. POST actions:
+- `{"action":"read","path":"file"}` returns `{ "content": "BASE64" }`.
+- `{"action":"write","path":"file","content":"BASE64"}` atomically creates/replaces an ordinary file, up to 1 MiB decoded bytes.
+- `{"action":"mkdir","path":"folder"}` creates a directory.
+- `{"action":"rename","path":"old","destination":"new"}` refuses existing destination.
+- `{"action":"delete","path":"entry"}` permanently deletes an entry; directories must be empty.
+- `{"action":"list","path":"folder"}` lists entry name/size/mode/UID/directory/symlink metadata.
+
+There are no archive, chmod, recursive delete, arbitrary-root-path, exec, SQL or shell endpoints.

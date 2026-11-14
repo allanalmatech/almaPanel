@@ -1,0 +1,24 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+[Unit]
+Description=almaPanel restricted Linux agent — Alma Tech Labs Inc.
+After=network.target
+[Service]
+Type=simple
+User=root
+Group=almapanel
+WorkingDirectory=/opt/almapanel
+ExecStart=/usr/bin/python3 -m agent.server
+RuntimeDirectory=almapanel
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/etc /srv/almapanel /var/lib/almapanel-agent /run/almapanel /var/log
+NoNewPrivileges=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+[Install]
+WantedBy=multi-user.target

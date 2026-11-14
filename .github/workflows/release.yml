@@ -1,0 +1,15 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+name: Gated release validation
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/release_gate.py
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 scripts/package.py
+# Publication deliberately absent until owner approval, live acceptance evidence,
+# signing key provisioning and protected-environment release review are complete.

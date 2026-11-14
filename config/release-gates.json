@@ -1,0 +1,11 @@
+{
+  "production_ready": false,
+  "owner_license_approved": false,
+  "ubuntu_24_04_amd64_acceptance": false,
+  "ubuntu_24_04_arm64_acceptance": false,
+  "tenant_isolation_vm": false,
+  "disaster_recovery_verified": false,
+  "upgrade_rollback_verified": false,
+  "security_review_complete": false,
+  "public_release_signed": false
+}

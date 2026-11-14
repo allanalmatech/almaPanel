@@ -1,0 +1,3065 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "almaPanel API",
+    "version": "0.1.0-alpha.1",
+    "description": "Copyright \u00a9 2026 Alma Tech Labs Inc. Evaluation alpha. Real Linux adapters require Ubuntu VM acceptance.",
+    "contact": {
+      "name": "Alma Tech Labs Inc.",
+      "url": "https://almatechconsults.com",
+      "email": "almatechuganda@gmail.com"
+    },
+    "license": {
+      "name": "LicenseRef-AlmaTech-Pending"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://localhost:8443/api"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "alma_session"
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Check database/API health",
+        "description": "Permissions: Public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "ok",
+                  "version": "0.1.0-alpha.1"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/setup": {
+      "post": {
+        "summary": "Create first administrator",
+        "description": "Permissions: Public + one-time setup token",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Administrator created. Sign in."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "token"
+                ]
+              },
+              "example": {
+                "username": "admin",
+                "password": "CHOOSE-AT-LEAST-14-CHARACTERS",
+                "token": "TOKEN-FROM-SERVER"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Create secure one-hour session",
+        "description": "Permissions: Public, rate-limited",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "csrf": "TOKEN"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ]
+              },
+              "example": {
+                "username": "admin",
+                "password": "YOUR-PASSWORD"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "summary": "Read own identity and CSRF token",
+        "description": "Permissions: Authenticated",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": 1,
+                  "username": "admin",
+                  "role": "admin",
+                  "csrf": "TOKEN",
+                  "last_ip": "203.0.113.7"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/logout": {
+      "post": {
+        "summary": "Revoke current session",
+        "description": "Permissions: Authenticated",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Signed out."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/password": {
+      "post": {
+        "summary": "Change password, revoke all sessions",
+        "description": "Permissions: Authenticated + current password",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Password changed. Sign in again."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "current",
+                  "password"
+                ]
+              },
+              "example": {
+                "current": "OLD-PASSWORD",
+                "password": "NEW-LONG-PASSWORD"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages": {
+      "get": {
+        "summary": "List global/owned packages",
+        "description": "Permissions: Authenticated, scoped",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": [
+                  {
+                    "id": 1,
+                    "name": "Small",
+                    "owner_id": null,
+                    "max_domains": 3
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "Create package",
+        "description": "Permissions: Admin or reseller",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Package created. Only domain-count limits are enforced in this release."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "max_domains": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "max_domains"
+                ]
+              },
+              "example": {
+                "name": "Small",
+                "max_domains": 3
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resellers": {
+      "get": {
+        "summary": "List resellers",
+        "description": "Permissions: Admin",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "Create reseller login/allocation",
+        "description": "Permissions: Admin",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Reseller created."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "max_accounts": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "max_accounts"
+                ]
+              },
+              "example": {
+                "username": "reseller",
+                "password": "CHOOSE-LONG-PASSWORD",
+                "max_accounts": 5
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "summary": "List authorized hosting accounts",
+        "description": "Permissions: Authenticated, scoped",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "Queue Linux hosting account",
+        "description": "Permissions: Admin or reseller within allocation",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "job_id": 1,
+                  "state": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "package_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "package_id"
+                ]
+              },
+              "example": {
+                "username": "customer",
+                "password": "CHOOSE-LONG-PASSWORD",
+                "package_id": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List 100 latest authorized jobs",
+        "description": "Permissions: Admin all; otherwise own actor",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/audit": {
+      "get": {
+        "summary": "List 200 latest audit events",
+        "description": "Permissions: Admin",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/system": {
+      "get": {
+        "summary": "Read live Linux statistics",
+        "description": "Permissions: Admin",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "load_average": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "memory_total": 0,
+                  "memory_available": 0,
+                  "disk_total": 0,
+                  "disk_used": 0,
+                  "services": {},
+                  "hostname": "server"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/services": {
+      "post": {
+        "summary": "Queue allowlisted restart",
+        "description": "Permissions: Admin + RESTART confirmation",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "job_id": 2,
+                  "state": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "confirm": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "confirm"
+                ]
+              },
+              "example": {
+                "service": "nginx",
+                "confirm": "RESTART"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/state": {
+      "post": {
+        "summary": "Queue active/suspended state",
+        "description": "Permissions: Admin or owning reseller",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "job_id": 3,
+                  "state": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "example": {
+                "state": "suspended"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/domains": {
+      "get": {
+        "summary": "List domains",
+        "description": "Permissions: Authorized active account",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Queue HTTP virtual host",
+        "description": "Permissions: Authorized active account within package",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "job_id": 4,
+                  "state": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "domain"
+                ]
+              },
+              "example": {
+                "domain": "example.com"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/stats": {
+      "get": {
+        "summary": "Read real account disk size",
+        "description": "Permissions: Authorized active account",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "home": "/srv/almapanel/accounts/customer",
+                  "disk_bytes": 0,
+                  "domains": 0,
+                  "disk_quota_bytes": null,
+                  "cpu_percent": null,
+                  "memory_bytes": null,
+                  "bandwidth_bytes": null,
+                  "quota_note": "Disk/CPU/RAM quotas are not enforced in this alpha."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/accounts/{id}/files": {
+      "get": {
+        "summary": "List directory; optional ?path=relative/path",
+        "description": "Permissions: Authorized active account",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": []
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Operate on files under tenant UID",
+        "description": "Permissions: Authorized active account",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "File saved."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "list",
+                      "read",
+                      "write",
+                      "mkdir",
+                      "rename",
+                      "delete"
+                    ]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "path"
+                ]
+              },
+              "example": {
+                "action": "write",
+                "path": "index.html",
+                "content": "SGVsbG8="
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+# Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Compile Python and check JavaScript
+        run: |
+          python3 -m compileall -q backend agent worker scripts tests
+          node --check frontend/app.js
+      - name: Shell syntax
+        run: find installer -name '*.sh' -exec bash -n {} +
+      - name: Reproducible archive
+        run: |
+          python3 scripts/package.py
+          cp dist/SHA256SUMS /tmp/expected
+          python3 scripts/package.py
+          diff /tmp/expected dist/SHA256SUMS
+      - name: Basic secret scan
+        run: python3 scripts/secret_scan.py
+      - name: Security analysis
+        run: |
+          python3 -m pip install bandit==1.8.6
+          bandit -r backend agent worker -ll -ii

@@ -1,0 +1,15 @@
+# Copyright (c) 2026 Alma Tech Labs Inc.
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.sqlite3*
+*.key
+*.pem
+*.log
+dist/
+node_modules/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
