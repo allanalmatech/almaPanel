@@ -154,6 +154,19 @@ class Files(unittest.TestCase):
         self.assertEqual(base64.b64decode(self.op('read','folder/hello.txt')['content']),b'hello')
         self.op('rename','folder/hello.txt',destination='folder/moved.txt')
         self.op('delete','folder/moved.txt');self.op('delete','folder');self.assertEqual(self.op('list'),[])
+    def test_permissions_and_link_rejection(self):
+        self.write('file')
+        self.op('chmod', 'file', mode='600')
+        self.assertEqual((self.root/'file').stat().st_mode & 0o777, 0o600)
+        with self.assertRaises(ValueError):
+            self.op('chmod', 'file', mode='777')
+        (self.root/'link').symlink_to(self.root/'file')
+        with self.assertRaises(OSError):
+            self.op('chmod', 'link', mode='644')
+        os.link(self.root/'file', self.root/'hardlink')
+        with self.assertRaises(ValueError):
+            self.op('chmod', 'hardlink', mode='644')
+
     def test_atomic_overwrite(self):
         self.write('a');self.write('a',b'updated');self.assertEqual((self.root/'a').read_bytes(),b'updated')
     def test_traversal(self):

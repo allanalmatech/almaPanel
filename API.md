@@ -332,3 +332,9 @@ All paths are relative to public_html. `GET files?path=folder` lists up to 5000 
 - `{"action":"list","path":"folder"}` lists entry name/size/mode/UID/directory/symlink metadata.
 
 There are no archive, chmod, recursive delete, arbitrary-root-path, exec, SQL or shell endpoints.
+
+## Permission editing
+POST /accounts/{id}/files also accepts action chmod, relative path and mode.
+Allowed modes are 600, 640, 644, 700, 750 and 755. Existing account authorization
+and CSRF checks apply. The tenant helper rejects symlinks, non-owned entries
+and hardlinked regular files. Changing permissions can remove Nginx access.

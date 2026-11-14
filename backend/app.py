@@ -188,7 +188,7 @@ def api(env, body, db, headers):
         if action=='files':
             query=parse_qs(env.get('QUERY_STRING',''))
             args = {'action':'list','path':query.get('path',[''])[0]} if method=='GET' else body
-            allowed = {'list','read','write','mkdir','rename','delete','copy'}
+            allowed = {'list','read','write','mkdir','rename','delete','copy','chmod'}
             if args.get('action') not in allowed:
                 raise c.Problem('File operation unavailable.')
             result = c.rpc('files',name=account['name'],request=args)

@@ -233,3 +233,201 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [~] GitHub Actions
 - [~] Dependency/secret scanning
 - [ ] Production acceptance
+
+## Consolidated requested backlog — 2026-11-14
+
+This section reconciles the user’s alpha.2 checklist. Items remain open until implementation and required acceptance pass.
+
+### Dashboard and navigation
+
+- [ ] Full grouped catalog and sidebar
+- [ ] notifications
+- [ ] language selector
+- [ ] profile controls
+- [ ] contextual help
+- [ ] keyboard/mobile acceptance
+- [ ] primary domain and shared IP
+- [ ] quota bars
+- [ ] bandwidth and resource counts
+- [ ] entry processes, I/O, inodes, tenant CPU/RAM
+
+### File Manager
+
+- [ ] Folder tree
+- [ ] drag-and-drop uploads
+- [ ] recursive search
+- [ ] previews
+- [ ] syntax highlighting
+- [~] hidden-files toggle — implemented, browser acceptance pending
+- [~] permission editor — implemented, live ACL acceptance pending
+- [ ] archives and safe ZIP extraction
+- [ ] trash/restore
+- [ ] recursive copy
+- [ ] full move workflow
+
+### Other Files tools
+
+- [ ] Images
+- [ ] Directory Privacy
+- [ ] WebDAV
+- [ ] FTP accounts and connections
+- [ ] tenant SSH/SFTP
+- [ ] Backup Wizard
+- [ ] Git Version Control
+- [ ] storage and inode enforcement
+
+### Databases
+
+- [ ] MySQL/MariaDB and PostgreSQL
+- [ ] database/user CRUD
+- [ ] privileges
+- [ ] password resets
+- [ ] remote controls
+- [ ] connection details
+- [ ] usage
+- [ ] SQL import/export
+- [ ] backup/restore
+- [ ] wizards
+- [ ] phpMyAdmin
+- [ ] PostgreSQL admin UI
+
+### Domains and DNS
+
+- [ ] Primary/addon/subdomain/parked domains and aliases
+- [ ] per-domain roots
+- [ ] redirects
+- [ ] verification
+- [ ] authoritative DNS
+- [ ] Zone Editor
+- [ ] dynamic DNS
+- [ ] templates
+- [ ] custom nameservers
+- [ ] DNSSEC
+- [ ] import/export
+- [ ] validation/reloads
+- [ ] A/AAAA/CNAME/MX/TXT/SRV/CAA/PTR records
+
+### Email
+
+- [ ] Mailbox CRUD/passwords/quotas
+- [ ] SMTP/IMAP
+- [ ] webmail
+- [ ] forwarding/aliases/autoresponders/catch-all
+- [ ] routing/lists/import
+- [ ] global and mailbox filters
+- [ ] spam
+- [ ] encryption
+- [ ] calendars/contacts
+- [ ] tracking/logs/queues
+- [ ] DKIM/SPF/DMARC
+- [ ] TLS
+- [ ] backups/migration
+- [ ] Postfix/Dovecot/Rspamd/Roundcube
+
+### Site SSL/TLS
+
+- [ ] ACME issuance/renewal
+- [ ] wildcard DNS challenges
+- [ ] custom certificates
+- [ ] validation/status/expiry alerts
+- [ ] HTTPS redirects
+- [ ] per-site TLS
+
+### Metrics
+
+- [ ] Visitors/errors/bandwidth/access logs
+- [ ] analytics
+- [ ] resource graphs
+- [ ] processes
+- [ ] CPU/RAM/I/O/entry processes/inodes
+
+### Security
+
+- [ ] MFA
+- [ ] API tokens
+- [ ] tenant SSH keys
+- [ ] firewall/Fail2ban/IP blocking/ModSecurity
+- [ ] hotlink/leech protection
+- [ ] malware/integrity scans
+- [ ] advisor/notifications
+- [ ] secret management
+- [ ] externally retained audit
+- [ ] hostile tenant tests
+
+### PHP and app hosting
+
+- [ ] PHP versions and per-domain selection
+- [ ] INI/extensions/resource settings/error logs
+- [ ] Composer
+- [ ] Node/Python/Ruby
+- [ ] dependencies/isolation/supervision/proxies/environment/logs/restarts/health
+
+### Application installer and WordPress
+
+- [ ] WordPress/Joomla/Drupal/phpBB/PrestaShop installs
+- [ ] database/TLS setup
+- [ ] versions/core/plugins/themes
+- [ ] backup/restore
+- [ ] staging/promotion
+- [ ] maintenance/security
+
+### Customer Git deployment
+
+- [ ] Create/clone/import
+- [ ] provider connections/private auth
+- [ ] SSH keys
+- [ ] branches/history/status/fetch/pull/push
+- [ ] webhooks/manual/automatic deployment
+- [ ] secrets/logs/notifications
+- [ ] build/test/release/rollback
+
+### Advanced tools and preferences
+
+- [ ] Cron/DNS Track/Indexes/Error Pages/Handlers/MIME/Process Manager
+- [ ] language/contact/user/account settings
+- [ ] browser terminal identity/WebSocket/resize/timeouts/audit/admin authorization
+
+### Hosting packages and resellers
+
+- [ ] Disk/bandwidth/mail/database/FTP/CPU/RAM/process/I/O/inode limits
+- [ ] retention
+- [ ] SSH/Git/app permissions
+- [ ] reseller branding/allocation/reports
+
+### Server administration
+
+- [ ] Termination
+- [ ] stop suspended workloads
+- [ ] hostname/network/IP
+- [ ] server settings
+- [ ] DNS/mail/database/PHP management
+- [ ] service controls/logs/packages/maintenance/reboot/scheduling
+- [ ] administrators/notifications
+
+### Backups and migration
+
+- [ ] Website/database/mail/DNS/full-account
+- [ ] scheduling/incremental
+- [ ] SFTP/S3
+- [ ] encryption/retention/integrity
+- [ ] download/progress/alerts
+- [ ] file/database/account restore
+- [ ] migration/disaster recovery
+
+### Installer, updates and releases
+
+- [ ] Public installer endpoint
+- [ ] signing/publication automation
+- [ ] dependency scanning/provenance
+- [ ] dependency/schema/platform upgrades
+- [ ] live updater/rollback tests
+- [ ] key enrollment
+- [ ] signed release assets
+
+### Production acceptance and documentation
+
+- [ ] Browser/accessibility
+- [ ] service integration
+- [ ] isolation/quotas/reboot/recovery
+- [ ] full restore/upgrades/mail/DNS/TLS/performance/security review
+- [ ] reconcile feature matrix/OpenAPI/guides/release checklist

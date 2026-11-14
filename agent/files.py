@@ -94,6 +94,21 @@ def operate(root, request):
                     err=ctypes.get_errno();raise OSError(err,os.strerror(err))
             finally: os.close(other)
             return {'message':'Renamed.'}
+        if action == 'chmod':
+            mode = request.get('mode')
+            if mode not in ('600', '640', '644', '700', '750', '755'):
+                raise ValueError('Choose 600, 640, 644, 700, 750 or 755.')
+            fd = os.open(leaf, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            try:
+                info = os.fstat(fd)
+                if info.st_uid != os.geteuid():
+                    raise ValueError('Only account-owned entries can be changed.')
+                if not stat.S_ISDIR(info.st_mode):
+                    regular(fd)
+                os.fchmod(fd, int(mode, 8))
+            finally:
+                os.close(fd)
+            return {'message': 'Permissions updated.'}
         if action == 'copy':
             destination = components(request.get('destination', ''))
             if not destination:

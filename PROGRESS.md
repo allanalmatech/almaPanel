@@ -31,3 +31,19 @@ The implementation is a real but incomplete evaluation core. No mail/hosted-data
 3. Verify two hostile tenants, socket isolation, service config failures and reboot behavior.
 4. Complete database/DNS/ACME/Git and customer-backup modules with real-service tests, then the remaining milestones.
 5. Complete all release acceptance criteria and independent security review before signing/publishing.
+
+## 2026-11-14 — Backlog reconciliation and File Manager work
+The complete 18-area checklist is recorded in TODO.md. Amazon Linux installation
+and initial setup passed according to the supplied EC2 logs and user testing.
+Alpha.2 source is published with file copying and signed application-update code.
+Signing-key enrollment, release assets and live rollback acceptance remain pending.
+
+Current implementation focus: hidden-file visibility and tenant-scoped permission
+editing. Broader modules remain open. Next work is safe archive handling, followed
+by customer database provisioning and per-domain site configuration.
+
+Implemented in this increment: hidden-files toggle and account-owned permission
+editing using no-follow descriptors. Only 600/640/644/700/750/755 modes are allowed.
+Symlinks, hardlinked regular files and non-owned entries are rejected.
+Validation: 37 local tests passed plus Python, JavaScript and shell syntax checks.
+Browser and live EC2 permission/ACL behavior still require acceptance.
