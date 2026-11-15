@@ -6,10 +6,11 @@ from urllib.parse import parse_qs
 
 from backend import core as c
 
-FILE_READS = {'list', 'read', 'search', 'download', 'trash_list', 'backups', 'backup_read',
+FILE_READS = {'list', 'list_page', 'read', 'search', 'download', 'archive_contents', 'trash_list', 'backups', 'backup_read',
               'backup_contents', 'backup_verify'}
 FILE_WRITES = {'write', 'mkdir', 'rename', 'delete', 'copy', 'chmod', 'trash', 'trash_restore',
                'trash_purge', 'archive', 'extract', 'copy_tree',
+               'upload_start', 'upload_chunk', 'upload_finish', 'upload_cancel',
                'backup_create', 'backup_restore', 'backup_restore_file', 'backup_delete'}
 
 
@@ -25,7 +26,7 @@ def files(db, user, account, method, env, body, ip):
     request = {'action': 'list', 'path': query.get('path', [''])[0]} if method == 'GET' else body
     action = allowed(request, FILE_READS | FILE_WRITES)
     result = c.rpc('files', name=account['name'], request=request)
-    if action in FILE_WRITES:
+    if action in FILE_WRITES and action != 'upload_chunk':
         c.audit(db, user['id'], f'files.{action}', account['id'], ip)
     return result
 

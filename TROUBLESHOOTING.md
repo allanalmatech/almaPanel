@@ -16,7 +16,8 @@ The software has unit-tested errors below; VM remedies are operational guidance,
 | Failed/interrupted account | Correct the cause in the agent journal and use **Hosting Accounts → Retry setup**. A leftover Linux user, group, home or PHP pool needs server-side reconciliation. |
 | Account creation fails and the agent sees read-only `/etc` | Upgrade from the reviewed Git checkout with `installer/enable-updates.sh`. The agent health check reports whether its account database mount is writable. |
 | Agent unavailable | Check agent service, socket ownership (root:almapanel 0660), process UID and journal. Never chmod the socket 0666. |
-| File rejected | Path traversal, symlink, hardlink, special file or >1 MiB may be involved. Use ordinary account-owned files within public_html. |
+| File rejected | Use an ordinary file under public_html. The source editor accepts UTF-8 text up to 1 MiB. Upload and download accept up to 256 MiB. See the [File Manager limits](docs/HOSTING.md#working-with-website-files) for other operations. |
+| Upload stops before publishing | Check available filesystem space and existing destination names. Cancel to discard the temporary data. Abandoned stages are eligible for cleanup after an hour. |
 | Nginx 403 for static files | Check account ACLs and directory traversal as www-data; do not make all homes world-readable. |
 | New site not reachable | Confirm job succeeded, DNS A record, instance address and security group port 80. No DNS server is provisioned by domain creation. |
 | Site HTTPS not available | Automatic site certificate management is not implemented. |

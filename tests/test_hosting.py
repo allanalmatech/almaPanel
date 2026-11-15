@@ -169,6 +169,93 @@ class FileTools(unittest.TestCase):
             self.op('write', 'file', create_only=True, content=base64.b64encode(b'new').decode())
         self.assertEqual((self.root / 'file').read_text(), 'original')
 
+    def test_paged_folders_and_search_use_hidden_filter_and_real_metadata(self):
+        for index in range(100):
+            (self.root / f'file-{index:03}.txt').write_text('data')
+        (self.root / 'subdir').mkdir()
+        (self.root / '.hidden').mkdir()
+        (self.root / '.hidden' / 'match.txt').write_text('hidden')
+        (self.root / '.alma-interrupted').write_bytes(b'incomplete')
+        first = self.op('list_page')
+        self.assertEqual((first['total'], first['next_offset']), (101, 100))
+        self.assertEqual(first['entries'][0]['name'], 'subdir')
+        second = self.op('list_page', offset=first['next_offset'])
+        last = second['entries'][0]
+        self.assertEqual((last['name'], last['size'], last['uid'], last['gid']),
+                         ('file-099.txt', 4, os.getuid(), os.getgid()))
+        folders = self.op('list_page', folders_only=True, include_hidden=True)['entries']
+        self.assertEqual([entry['name'] for entry in folders], ['.hidden', 'subdir'])
+        self.assertFalse(self.op('search', query='match', include_hidden=False)['matches'])
+        self.assertEqual(self.op('search', query='match')['matches'][0]['path'], '.hidden/match.txt')
+        with self.assertRaisesRegex(ValueError, 'reserved'):
+            self.op('read', '.alma-interrupted')
+
+    def test_upload_retries_chunks_and_finalization_without_replacing_files(self):
+        contents = b'A' * file_tools.CHUNK + b'B' * file_tools.CHUNK + b'end'
+        started = self.op('upload_start', 'large.bin', size=len(contents))
+        upload_id = started['upload_id']
+        self.assertEqual(started['chunk_bytes'], file_tools.CHUNK)
+        self.assertFalse((self.root / 'large.bin').exists())
+        with self.assertRaisesRegex(ValueError, 'incomplete'):
+            self.op('upload_finish', upload_id=upload_id)
+        for offset in range(0, len(contents), file_tools.CHUNK):
+            chunk = contents[offset:offset + file_tools.CHUNK]
+            values = {'upload_id': upload_id, 'offset': offset, 'content': base64.b64encode(chunk).decode()}
+            self.assertEqual(self.op('upload_chunk', **values)['offset'], offset + len(chunk))
+            self.assertEqual(self.op('upload_chunk', **values)['offset'], offset + len(chunk))
+        finished = self.op('upload_finish', upload_id=upload_id)
+        self.assertEqual(self.op('upload_finish', upload_id=upload_id), finished)
+        self.assertEqual((self.root / 'large.bin').read_bytes(), contents)
+        self.assertFalse((self.private / 'uploads' / upload_id / 'data').exists())
+        self.op('copy', 'large.bin', destination='copy.bin')
+        self.assertEqual((self.root / 'copy.bin').read_bytes(), contents)
+        downloaded = self.op('download', 'large.bin')
+        self.assertEqual(base64.b64decode(downloaded['content']), contents[:file_tools.CHUNK])
+        (self.root / 'large.bin').write_bytes(contents + b'edit')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.op('download', 'large.bin', offset=file_tools.CHUNK, revision=downloaded['revision'])
+
+    def test_upload_never_publishes_to_replaced_folder_or_existing_destination(self):
+        (self.root / 'web').mkdir()
+        with self.assertRaisesRegex(ValueError, '256 MiB'):
+            self.op('upload_start', 'oversize', size=file_tools.TRANSFER_BYTES + 1)
+        upload_id = self.op('upload_start', 'web/new.html', size=3)['upload_id']
+        with self.assertRaisesRegex(ValueError, 'order'):
+            self.op('upload_chunk', upload_id=upload_id, offset=1, content='Yg==')
+        self.op('upload_chunk', upload_id=upload_id, offset=0, content='YWJj')
+        with self.assertRaisesRegex(ValueError, 'differs'):
+            self.op('upload_chunk', upload_id=upload_id, offset=0, content='eA==')
+        (self.root / 'web' / 'new.html').write_text('existing')
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            self.op('upload_finish', upload_id=upload_id)
+        self.assertEqual((self.root / 'web' / 'new.html').read_text(), 'existing')
+        (self.root / 'web').rename(self.root / 'original')
+        (self.root / 'web').mkdir()
+        with self.assertRaisesRegex(ValueError, 'folder changed'):
+            self.op('upload_finish', upload_id=upload_id)
+        self.assertFalse((self.root / 'web' / 'new.html').exists())
+        self.op('upload_cancel', upload_id=upload_id)
+        self.assertFalse((self.private / 'uploads' / upload_id).exists())
+
+    def test_editor_rejects_stale_revision_and_retains_file_mode(self):
+        path = self.root / 'script.php'
+        path.write_bytes(b'first')
+        path.chmod(0o600)
+        before = self.op('read', 'script.php')['revision']
+        self.op('write', 'script.php', content='c2Vjb25k', expected_revision=before)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        with self.assertRaisesRegex(ValueError, 'changed since'):
+            self.op('write', 'script.php', content='c3RhbGU=', expected_revision=before)
+        self.assertEqual(path.read_bytes(), b'second')
+
+    def test_preview_and_extract_zip_from_a_single_file(self):
+        (self.root / 'page.txt').write_text('contents')
+        self.op('archive', 'page.txt', destination='pack.zip')
+        listed = self.op('archive_contents', 'pack.zip')
+        self.assertEqual(listed['entries'], [{'path': 'page.txt', 'size': 8}])
+        self.op('extract', 'pack.zip', destination='new')
+        self.assertEqual((self.root / 'new' / 'page.txt').read_text(), 'contents')
+
 
 class Validation(unittest.TestCase):
     def test_document_roots_and_aliases(self):

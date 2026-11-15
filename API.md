@@ -331,22 +331,42 @@ Response shape/example (illustrative, not live measurements):
 }
 ```
 
-## File operation variants
-All paths are relative to public_html. `GET files?path=folder` lists up to 5000 entries. POST actions:
-- `{"action":"read","path":"file"}` returns `{ "content": "BASE64" }`.
-- `{"action":"write","path":"file","content":"BASE64"}` atomically creates/replaces an ordinary file, up to 1 MiB decoded bytes.
-- `{"action":"mkdir","path":"folder"}` creates a directory.
-- `{"action":"rename","path":"old","destination":"new"}` refuses existing destination.
-- `{"action":"delete","path":"entry"}` permanently deletes an entry; directories must be empty.
-- `{"action":"list","path":"folder"}` lists entry name/size/mode/UID/directory/symlink metadata.
+## File Manager operations
 
-There are no archive, chmod, recursive delete, arbitrary-root-path, exec, SQL or shell endpoints.
+All paths are relative to `public_html`. The account must be active and
+accessible to the signed-in user. POST requests use the session and CSRF token.
+`GET files?path=folder` keeps the unpaged directory-listing response.
 
-## Permission editing
-POST /accounts/{id}/files also accepts action chmod, relative path and mode.
-Allowed modes are 600, 640, 644, 700, 750 and 755. Existing account authorization
-and CSRF checks apply. The tenant helper rejects symlinks, non-owned entries
-and hardlinked regular files. Changing permissions can remove Nginx access.
+| POST action | Request fields beside `action` | Result |
+|---|---|---|
+| `list_page` | `path`, optional `offset`, `include_hidden`, `folders_only` | `path`, `total`, `entries` and nullable `next_offset`. Entry fields include `name`, `size`, `mode`, `uid`, `gid`, `owner`, `group`, `modified` (Unix seconds), and type flags. |
+| `search` | `path`, `query`, optional `include_hidden` | Matching paths and a `truncated` flag. |
+| `read` | `path` | Base64 `content` and `revision` for a regular file up to 1 MiB. |
+| `write` | `path`, base64 `content`, optional `create_only` or `expected_revision` | Save up to 1 MiB and return `message` and `revision`. `create_only` requires a new path and `expected_revision` checks an existing file. |
+| `download` | `path`, `offset` (initially zero), `revision` (required for later chunks) | Base64 `content`, total byte `size`, `revision` and `done`. Ordinary downloads allow up to 256 MiB. |
+| `mkdir`, `delete` | `path` | Create a folder or permanently delete one entry. Direct deletion of a folder requires it to be empty. |
+| `copy`, `copy_tree`, `rename` | `path`, `destination` | Copy or move to an unused path. |
+| `chmod` | `path`, `mode` as three octal digits | Change permission bits for an account-owned directory or ordinary file. |
+| `archive`, `extract` | `path`, `destination` | ZIP a file or folder, or extract to a new folder. |
+| `archive_contents` | ZIP `path`, optional `query`, `offset`, `revision` | List ZIP member file paths and sizes. |
+| `trash`, `trash_list` | Entry `path` for `trash` | Move an entry to private Trash, or list entry IDs and original paths. |
+| `trash_restore`, `trash_purge` | Trash entry `id`, plus unused `destination` for restore | Restore or permanently remove an entry. |
+
+### Multi-chunk upload
+
+1. Send `{"action":"upload_start","path":"assets/photo.png","size":1310730}`.
+   The response provides `upload_id`, `offset` and `chunk_bytes`.
+2. Send `upload_chunk` with `upload_id`, byte `offset` and base64 `content`.
+   The server returns the next offset. A retry at the same offset must match
+   the bytes already stored there. Chunks are limited to 512 KiB in this build.
+3. Send `upload_finish` with `upload_id` to publish the complete file, or
+   `upload_cancel` to discard the stage. The server checks the original
+   parent directory and refuses to replace an existing file.
+
+A successful finish returns `message`, relative `path` and byte `size`.
+The upload limit is 256 MiB. Permission errors, existing destinations and
+revision conflicts return the agent error as JSON. Cross-account paths return
+404 and missing or invalid CSRF credentials return 403.
 
 ## Alpha.3 hosting routes
 

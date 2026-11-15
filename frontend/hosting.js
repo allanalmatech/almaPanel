@@ -31,18 +31,24 @@ function downloadBlob(blob, filename) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function readLargeFile(path, action, name) {
+async function readLargeFile(path, action, name, options = {}) {
     let offset = 0;
     let revision = '';
     const chunks = [];
-    const maxSize = (action === 'backup_read' ? 130 : 66) * 1024 * 1024;
+    const maxSize = options.maxBytes ?? (action === 'backup_read' ? 130 : 66) * 1024 * 1024;
     while (true) {
+        if (options.active && !options.active()) throw Error('Transfer stopped.');
         const result = await filePath(path, action, {path: name, offset, revision});
+        if (result.size > maxSize) throw Error('File exceeds the transfer or preview limit.');
         const chunk = Uint8Array.from(atob(result.content), char => char.charCodeAt(0));
         chunks.push(chunk);
         offset += chunk.length;
         revision = result.revision;
-        if (result.done) break;
+        options.progress?.(offset, result.size);
+        if (result.done) {
+            if (offset !== result.size) throw Error('Incomplete download.');
+            break;
+        }
         if (!chunk.length || offset > maxSize) throw Error('Download exceeds the size limit.');
     }
     return chunks;
@@ -216,10 +222,11 @@ async function trashView(epoch) {
     const scope = $('#main');
     actionHandler(scope, '[data-trash-restore]', async button => {
         const item = items[Number(button.dataset.trashRestore)];
-        const destination = prompt('Restore to a path relative to public_html', item.path);
-        if (!destination) return;
-        notice((await filePath(path, 'trash_restore', {id: item.id, destination})).message);
-        if (activeView(epoch, base)) await route();
+        chooseFileTarget(path, 'Restore from Trash', parentFilePath(item.path), leafFileName(item.path),
+            'Restore entry', async destination => {
+                notice((await filePath(path, 'trash_restore', {id: item.id, destination})).message);
+                if (activeView(epoch, base)) await route();
+            });
     });
     actionHandler(scope, '[data-trash-delete]', async button => {
         const item = items[Number(button.dataset.trashDelete)];
@@ -551,228 +558,12 @@ async function dnsView(epoch) {
     await load();
 }
 
-async function fileManagerView(epoch) {
-    const base = boundAccount();
-    const path = base + 'files';
-    const current = currentPath;
-    const listing = await api(path + '?path=' + encodeURIComponent(current));
-    if (!activeView(epoch, base) || current !== currentPath) return;
-    const entries = listing.filter(entry => showHidden || !entry.name.startsWith('.'));
-    const parts = current.split('/').filter(Boolean);
-    const breadcrumbs = ['public_html', ...parts].map((part, index) =>
-        `<button class="subtle" data-folder-level="${index}">${esc(part)}</button>`).join(' / ');
-    const folders = entries.filter(entry => entry.directory);
-    view('File Manager', 'Manage files under public_html. New extracts and copies cannot replace an existing destination.',
-        `<section class="panel"><div class="toolbar" aria-label="Current folder">${breadcrumbs}</div>
-        <div class="toolbar">
-            <label>Folder path<input id="path" value="${esc(current)}" placeholder="public_html"></label>
-            <button id="go">Go</button>
-            <label><input id="hidden-files" type="checkbox" ${showHidden ? 'checked' : ''}> Show hidden files</label>
-        </div>
-        <div class="toolbar"><button id="new-file">New file</button><button id="new-dir" class="subtle">New folder</button>
-            <button id="archive-folder" class="subtle">Archive folder</button><a href="#trash">Trash</a><a href="#backups">Website backups</a></div>
-        <form id="file-search"><label>Search this folder and its subfolders<input name="query" maxlength="120" required></label>
-            <button type="submit">Search</button></form><div id="file-results" aria-live="polite"></div>
-        <div class="drop-zone" id="drop-files"><label>Upload or drop files (1 MiB per file)<input type="file" id="upload" multiple></label></div>
-        ${folders.length ? `<nav aria-label="Child folders" class="toolbar">${folders.map((entry, index) =>
-            `<button class="subtle" data-child-folder="${index}">${esc(entry.name)}/</button>`).join('')}</nav>` : ''}
-        ${table(['Name', 'Size', 'Mode / UID', 'Actions'], entries.map((entry, index) => [
-            `<button class="subtle file-name" data-open-entry="${index}">${esc(entry.name)}${entry.directory ? '/' : ''}${entry.symlink ? ' (symlink)' : ''}</button>`,
-            esc(entry.size), esc(entry.mode + ' / ' + entry.uid),
-            `<div class="toolbar">${entry.symlink ? '' : `<button class="subtle" data-file-copy="${index}">Copy</button>
-                <button class="subtle" data-file-mode="${index}">Permissions</button>`}
-                <button class="subtle" data-file-move="${index}">Move / Rename</button>
-                ${!entry.directory && !entry.symlink ? `<button class="subtle" data-file-download="${index}">Download</button>` : ''}
-                ${entry.name.toLowerCase().endsWith('.zip') && !entry.symlink && !entry.directory ? `<button class="subtle" data-file-zip="${index}">Extract</button>` : ''}
-                <button class="subtle" data-file-trash="${index}">Move to Trash</button></div>`
-        ]))}
-        <div id="editor"></div></section>`);
-    const scope = $('#main');
-    const relative = leaf => current ? current + '/' + leaf : leaf;
-    const refresh = async () => {
-        if (activeView(epoch, base) && current === currentPath) await route();
-    };
-    const open = folder => {
-        if (!activeView(epoch, base)) return;
-        currentPath = folder;
-        route();
-    };
-    const pathFree = async (target) => {
-        const index = target.lastIndexOf('/');
-        const parent = index === -1 ? '' : target.slice(0, index);
-        const leaf = target.slice(index + 1);
-        return !(await api(path + '?path=' + encodeURIComponent(parent))).some(entry => entry.name === leaf);
-    };
-    async function edit(location, create = false) {
-        const mime = /\.(png|jpe?g|gif|webp)$/i.exec(location);
-        if (mime && !create) {
-            const chunks = await readLargeFile(path, 'download', location);
-            if (!activeView(epoch, base)) return;
-            const type = mime[1].toLowerCase().replace(/^jpg$/, 'jpeg');
-            const image = document.createElement('img');
-            image.alt = location;
-            image.className = 'file-preview';
-            const url = URL.createObjectURL(new Blob(chunks, {type: 'image/' + type}));
-            image.onload = image.onerror = () => URL.revokeObjectURL(url);
-            image.src = url;
-            $('#editor').replaceChildren(image);
-            return;
-        }
-        const result = create ? {content: ''} : await filePath(path, 'read', {path: location});
-        if (!activeView(epoch, base)) return;
-        let source;
-        try {
-            const bytes = Uint8Array.from(atob(result.content), char => char.charCodeAt(0));
-            source = new TextDecoder('utf-8', {fatal: true}).decode(bytes);
-            if (source.includes(String.fromCharCode(0))) throw Error('Binary file');
-        } catch {
-            $('#editor').textContent = 'Use Download for this binary file.';
-            return;
-        }
-        $('#editor').innerHTML = `<form id="file-editor"><h2>${esc(location)}</h2>
-            <label>Contents<textarea class="code-area" name="content" spellcheck="false"></textarea></label>
-            <div class="toolbar"><button type="submit">Save</button><button type="button" id="show-source" class="subtle">Highlight source</button></div>
-            <pre id="source-preview" hidden></pre></form>`;
-        $('#file-editor').elements.content.value = source;
-        actionHandler($('#editor'), '#show-source', async () => renderSource($('#file-editor').elements.content.value, $('#source-preview')));
-        form('#file-editor', async fields => {
-            const bytes = new TextEncoder().encode(fields.content);
-            if (bytes.length > 1048576) throw Error('File exceeds 1 MiB.');
-            const content = bytesToBase64(bytes);
-            notice((await filePath(path, 'write', {path: location, content, create_only: create})).message);
-            await refresh();
-        });
-    }
-    actionHandler(scope, '[data-folder-level]', async button => open(parts.slice(0, Number(button.dataset.folderLevel)).join('/')));
-    actionHandler(scope, '[data-child-folder]', async button => open(relative(folders[Number(button.dataset.childFolder)].name)));
-    $('#go').onclick = () => open($('#path').value);
-    $('#hidden-files').onchange = event => { showHidden = event.target.checked; refresh(); };
-    actionHandler(scope, '#new-file', async () => {
-        const name = prompt('New file name');
-        if (!name) return;
-        const target = relative(name);
-        if (!await pathFree(target)) throw Error('File already exists.');
-        await edit(target, true);
-    });
-    actionHandler(scope, '#new-dir', async () => {
-        const name = prompt('New folder name');
-        if (!name) return;
-        notice((await filePath(path, 'mkdir', {path: relative(name)})).message);
-        await refresh();
-    });
-    actionHandler(scope, '#archive-folder', async () => {
-        const destination = prompt('New ZIP path relative to public_html', parts.length ? parts.at(-1) + '.zip' : 'website.zip');
-        if (!destination) return;
-        notice((await filePath(path, 'archive', {path: current, destination})).message);
-        await refresh();
-    });
-    actionHandler(scope, '[data-open-entry]', async button => {
-        const item = entries[Number(button.dataset.openEntry)];
-        if (item.symlink) throw Error('Symlinks cannot be opened.');
-        const target = relative(item.name);
-        if (item.directory) open(target);
-        else await edit(target);
-    });
-    actionHandler(scope, '[data-file-copy]', async button => {
-        const file = entries[Number(button.dataset.fileCopy)];
-        const destination = prompt('Copy to a new path relative to public_html', relative(file.name + '.copy'));
-        if (!destination) return;
-        notice((await filePath(path, file.directory ? 'copy_tree' : 'copy',
-            {path: relative(file.name), destination})).message);
-        await refresh();
-    });
-    actionHandler(scope, '[data-file-move]', async button => {
-        const file = entries[Number(button.dataset.fileMove)];
-        const destination = prompt('Move to a free path relative to public_html', relative(file.name));
-        if (!destination || destination === relative(file.name)) return;
-        notice((await filePath(path, 'rename', {path: relative(file.name), destination})).message);
-        await refresh();
-    });
-    actionHandler(scope, '[data-file-mode]', async button => {
-        const file = entries[Number(button.dataset.fileMode)];
-        const mode = prompt('Permissions: 600, 640, 644, 700, 750 or 755. Removing read/traverse access may stop web serving.',
-            file.mode.replace(/^0o/, ''));
-        if (!mode) return;
-        notice((await filePath(path, 'chmod', {path: relative(file.name), mode})).message);
-        await refresh();
-    });
-    actionHandler(scope, '[data-file-download]', async button => {
-        const file = entries[Number(button.dataset.fileDownload)];
-        downloadBlob(new Blob(await readLargeFile(path, 'download', relative(file.name))), file.name);
-    });
-    actionHandler(scope, '[data-file-zip]', async button => {
-        const file = entries[Number(button.dataset.fileZip)];
-        const destination = prompt('New destination folder relative to public_html', relative(file.name.replace(/\.zip$/i, '')));
-        if (!destination) return;
-        notice((await filePath(path, 'extract', {path: relative(file.name), destination})).message);
-        await refresh();
-    });
-    actionHandler(scope, '[data-file-trash]', async button => {
-        const file = entries[Number(button.dataset.fileTrash)];
-        if (!await confirmed(`Move ${file.name} to Trash?`)) return;
-        notice((await filePath(path, 'trash', {path: relative(file.name)})).message);
-        await refresh();
-    });
-    form('#file-search', async fields => {
-        const results = await filePath(path, 'search', {path: current, query: fields.query});
-        if (!activeView(epoch, base)) return;
-        const matches = results.matches.filter(item => showHidden || !item.path.split('/').some(part => part.startsWith('.')));
-        const box = $('#file-results');
-        box.innerHTML = table(['Matching path', ''], matches.map((item, index) => [esc(item.path),
-            item.symlink ? 'Symlink' : `<button class="subtle" data-result="${index}">Open</button>`])) +
-            (results.truncated ? '<p>Search reached its scanning or display limit.</p>' : '');
-        actionHandler(box, '[data-result]', async button => {
-            const match = matches[Number(button.dataset.result)];
-            if (match.directory) open(match.path);
-            else await edit(match.path);
-        });
-    });
-    async function upload(files) {
-        if (!files.length) return;
-        if (files.length > 50) throw Error('Upload up to 50 files at a time.');
-        for (const file of files) {
-            if (file.size > 1048576) throw Error(file.name + ' exceeds 1 MiB.');
-            const content = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
-            await filePath(path, 'write', {path: relative(file.name), content, create_only: true});
-        }
-        notice('Files uploaded.');
-        await refresh();
-    }
-    $('#upload').onchange = event => upload(event.target.files).catch(error => notice(error.message));
-    const drop = $('#drop-files');
-    drop.ondragover = event => { event.preventDefault(); drop.classList.add('dropping'); };
-    drop.ondragleave = () => drop.classList.remove('dropping');
-    drop.ondrop = event => {
-        event.preventDefault();
-        drop.classList.remove('dropping');
-        upload(event.dataTransfer.files).catch(error => notice(error.message));
-    };
-}
-
 function bytesToBase64(bytes) {
     let binary = '';
     for (let offset = 0; offset < bytes.length; offset += 4096) {
         binary += String.fromCharCode(...bytes.subarray(offset, offset + 4096));
     }
     return btoa(binary);
-}
-
-function renderSource(source, preview) {
-    if (source.length > 150000) throw Error('Source preview is limited to 150,000 characters.');
-    preview.hidden = false;
-    const fragment = document.createDocumentFragment();
-    const tokens = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|\/\/[^\n]*|<!--[^]*?-->|\b(?:class|def|function|return|const|let|var|if|else|await|import|echo|public|private|new|true|false|null)\b)/g;
-    let offset = 0;
-    for (const match of source.matchAll(tokens)) {
-        fragment.append(document.createTextNode(source.slice(offset, match.index)));
-        const token = document.createElement('span');
-        token.className = 'source-token';
-        token.textContent = match[0];
-        fragment.append(token);
-        offset = match.index + match[0].length;
-    }
-    fragment.append(document.createTextNode(source.slice(offset)));
-    preview.replaceChildren(fragment);
 }
 
 function gitView(epoch) {

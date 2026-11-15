@@ -13,7 +13,7 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 ## Milestone 2 — Hosting core
 - [~] Linux accounts, PHP pools, HTTP vhosts, basic file manager.
 - [ ] Customer databases, DNS and domain verification.
-- [ ] Extend file manager safely with requested advanced operations.
+- [x] Extend File Manager with the advanced operations tested in alpha.10.
 
 ## Milestone 3 — Hosting services
 - [~] Mail, ACME renewal, SFTP/SSH, cron, Git, application hosting.
@@ -55,8 +55,8 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [~] Installation framework
 
 ### Files
-- [~] File Manager
-- [ ] Images
+- [~] File Manager — Linux and browser checks pass; live VM acceptance remains open
+- [x] Images — locally verified in alpha.10
 - [ ] Directory Privacy
 - [~] Disk Usage
 - [ ] Web Disk
@@ -65,13 +65,13 @@ Legend: [ ] not started; [~] in progress; [x] completed **local subtask**. No fu
 - [ ] Backup
 - [ ] Backup Wizard
 - [ ] Git Version Control
-- [ ] Archive creation
-- [ ] ZIP extraction
-- [ ] Trash and restore
-- [ ] Permissions editor
-- [ ] Syntax highlighting
-- [ ] Hidden files toggle
-- [ ] Drag and drop upload
+- [x] Archive creation — locally verified in alpha.10
+- [x] ZIP extraction — locally verified in alpha.10
+- [x] Trash and restore — locally verified in alpha.10
+- [x] Permissions editor — locally verified in alpha.10
+- [x] Syntax highlighting — locally verified in alpha.10
+- [x] Hidden files toggle — locally verified in alpha.10
+- [x] Drag and drop upload — locally verified in alpha.10
 
 ### Databases
 - [ ] phpMyAdmin
@@ -254,21 +254,22 @@ This section reconciles the user’s alpha.2 checklist. Items remain open until 
 
 ### File Manager
 
-- [ ] Folder tree
-- [ ] drag-and-drop uploads
-- [ ] recursive search
-- [ ] previews
-- [ ] syntax highlighting
-- [~] hidden-files toggle — implemented, browser acceptance pending
-- [~] permission editor — implemented, live ACL acceptance pending
-- [ ] archives and safe ZIP extraction
-- [ ] trash/restore
-- [ ] recursive copy
-- [ ] full move workflow
+- [x] Expandable folder tree and paged listing
+- [x] Multiple and drag-and-drop uploads, progress, cancel and chunk retries
+- [x] Recursive search and hidden-file visibility controls
+- [x] Image, audio, video and ZIP previews, plus source viewing
+- [x] Syntax-highlighted text editing and revision checks
+- [x] File downloads, metadata, ownership and real account usage
+- [x] File permissions, ZIP creation and safe extraction
+- [x] Trash, restore and permanent removal
+- [x] Recursive copy and a browseable destination picker for move and rename
+- [ ] Verify the complete flow with service permissions and tenant isolation on
+      installed Amazon Linux and Ubuntu VMs
+- [ ] Test mobile controls on physical devices and additional browser engines
 
 ### Other Files tools
 
-- [ ] Images
+- [x] Image resize and format conversion in File Manager
 - [ ] Directory Privacy
 - [ ] WebDAV
 - [ ] FTP accounts and connections

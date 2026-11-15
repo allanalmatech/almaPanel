@@ -1,7 +1,7 @@
 # Feature matrix
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**Alpha.8 evaluation.** Core installation and first-admin setup were verified by
+**Alpha.10 evaluation.** Core installation and first-admin setup were verified by
 the operator on Amazon Linux 2023 during alpha.1. The table distinguishes local
 tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 
@@ -17,23 +17,23 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Privileged agent | Foundation | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | UID-checked Unix socket and closed operation list |
 | Frontend shell | Foundation | Implemented locally / partial | Not applicable or control-plane only | Core tests where applicable; see TESTING | Ubuntu 24.04 target | Original role-aware shell; browser run blocked |
 | Installation framework | Foundation | Partial | Ubuntu and Amazon Linux adapters | Amazon Linux alpha.1 installed by operator | Ubuntu 24.04 / AL2023 | Fresh alpha.3 runs and reboot pending |
-| File Manager | Files | Expanded | Tenant UID, descriptor paths, archive limits and private Trash | Local round trips and rejection tests | Ubuntu 24.04 / AL2023 | Browser tests and heavy workload acceptance pending |
-| Images | Files | Partial | PNG, JPEG, GIF and WebP preview | JS syntax | Ubuntu 24.04 / AL2023 | No resizing or conversion |
+| File Manager | Files | Implemented and locally verified | Account UID, descriptor paths, private staging, search, copy, move and restore | Linux helper, WSGI and Chromium tests | Ubuntu 24.04 / AL2023 | Installed VM acceptance pending |
+| Images | Files | Implemented in File Manager | Image previews and resize/convert to PNG, JPEG or WebP with unused-path writes | Chromium decoded a PNG and saved a resized WebP | Ubuntu 24.04 / AL2023 | File-by-file conversion; 16 megapixel output limit |
 | Directory Privacy | Files | Implemented locally | Nginx HTTPS Basic authentication | Local real static and PHP route checks | Ubuntu 24.04 / AL2023 | Dedicated document root; one login per rule |
-| Disk Usage | Files | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Actual du size, no enforcement |
+| Disk Usage | Files | Implemented with real account measurements | Tenant-scoped Linux du shown in Files and account statistics | WSGI and browser rendering; VM acceptance pending | Ubuntu 24.04 / AL2023 | Storage and inode enforcement pending |
 | Web Disk | Files | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | FTP Accounts | Files | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | FTP Connections | Files | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Backup | Files | Partial | Private website ZIP and SQL dump | Local ZIP restore | Ubuntu 24.04 / AL2023 | Website archive and SQL are separate; no mail data |
 | Backup Wizard | Files | Partial | Website archive browsing, verification and selective restore | Local ZIP and Chromium workflow tests | Ubuntu 24.04 / AL2023 | Full-account guided recovery remains open |
 | Git Version Control | Files | Partial | Public Git branch staging under tenant UID | URL and branch validation | Ubuntu 24.04 / AL2023 | No private repos, webhooks, build scripts or push |
-| Archive creation | Files | Implemented locally | ZIP under tenant UID | Round trip and size budget tests | Ubuntu 24.04 / AL2023 | 64 MiB and 5,000-entry default limits |
-| ZIP extraction | Files | Implemented locally | Staging, size limits and no-overwrite publish | Rejects links, absolute paths and traversal | Ubuntu 24.04 / AL2023 | Live workload acceptance pending |
-| Trash and restore | Files | Implemented locally | Private account storage | Local restore and conflict checks | Ubuntu 24.04 / AL2023 | User-managed retention |
-| Permissions editor | Files | Implemented locally | Allowed chmod modes for owned files/folders | Local link denial tests | Ubuntu 24.04 / AL2023 | VM ACL acceptance pending |
-| Syntax highlighting | Files | Partial | Highlighted source preview | JS syntax | Ubuntu 24.04 / AL2023 | Lightweight preview, no language grammar editor |
-| Hidden files toggle | Files | Implemented locally | Frontend filter | JS syntax | Ubuntu 24.04 / AL2023 | Browser acceptance pending |
-| Drag and drop upload | Files | Implemented locally | File drop and no-overwrite upload | Local no-overwrite test | Ubuntu 24.04 / AL2023 | 1 MiB per file |
+| Archive creation | Files | Implemented locally | ZIP single files and folders under tenant UID | Linux and Chromium round trips | Ubuntu 24.04 / AL2023 | 64 MiB and 5,000 entries |
+| ZIP extraction | Files | Implemented locally | ZIP32 preflight, descriptor-based extraction and no-overwrite publication | Linux link, corrupt archive and traversal rejection; Chromium extraction | Ubuntu 24.04 / AL2023 | Single-disk archives; 64 MiB unpacked content |
+| Trash and restore | Files | Implemented locally | Private account storage and unused-path restore | Linux conflict tests and Chromium restore | Ubuntu 24.04 / AL2023 | User-managed retention |
+| Permissions editor | Files | Implemented locally | Owner/group/other bits on account-owned entries | Linux chmod and link rejection; Chromium permissions dialog | Ubuntu 24.04 / AL2023 | Systemd and Nginx ACL acceptance on installed VM pending |
+| Syntax highlighting | Files | Implemented in editor | Live highlighting for common hosting languages; revision-aware saves | Chromium edit/save and Linux revision test | Ubuntu 24.04 / AL2023 | 1 MiB UTF-8 editor; plain text fallback for larger source |
+| Hidden files toggle | Files | Implemented locally | Server-side listing and search visibility options | Linux and Chromium | Ubuntu 24.04 / AL2023 | Reserved staging files are always hidden |
+| Drag and drop upload | Files | Implemented locally | Private chunking, retries, progress, cancel and atomic publish | Chromium input/drop and 256 MiB Linux CLI checksum test | Ubuntu 24.04 / AL2023 | 256 MiB per file and 50 files in a picker batch |
 | phpMyAdmin | Databases | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | MySQL Databases | Databases | Partial | Local MariaDB database + dedicated login | Real MariaDB local create/read/drop and isolation | Ubuntu 24.04 / AL2023 | One login per DB; MySQL server adapter and remote access remain open |
 | MySQL Database Wizard | Databases | Partial | One form creates a database + login | Local adapter tests | Ubuntu 24.04 / AL2023 | Extra users and granular grants remain open |

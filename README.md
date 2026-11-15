@@ -36,7 +36,7 @@ Select “First installation? Set up administrator”. There is no default admin
 - Queued Linux user creation, per-account directories, POSIX isolation/ACLs and dedicated PHP-FPM pools.
 - Nginx HTTP virtual hosts with pre-reload validation and configuration rollback.
 - Web/panel suspension and unsuspension; existing PHP requests are not forcibly terminated.
-- File browsing, binary upload/download, text editing, mkdir, non-overwriting rename, permanent delete; maximum file size 1 MiB. Directory traversal uses no-follow file descriptors, with operations executed under the tenant UID.
+- File Manager with nested navigation and search, drag-and-drop uploads, downloads, syntax-highlighted text editing, media previews, image resizing/conversion, permissions, ZIP and recoverable Trash. Transfers allow up to 256 MiB per file. Operations run as the account Linux user.
 - Actual disk-size measurements and administrator system/service statistics. Unavailable metrics are explicitly unavailable.
 - Fixed service restart allowlist, job history, failure reporting and restart-interruption handling.
 - Installer/preflight, health checks, non-destructive disablement, control-database snapshot/restore, recovery scripts, deterministic source packaging and gated CI.

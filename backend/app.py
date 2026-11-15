@@ -273,13 +273,13 @@ def api(env, body, db, headers):
 
 def application(env, start_response):
     headers=[('Content-Type','application/json'),('Cache-Control','no-store'),('X-Content-Type-Options','nosniff'),
-             ('Content-Security-Policy',"default-src 'self'; style-src 'self'; img-src 'self' blob:; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
+             ('Content-Security-Policy',"default-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
              ('Referrer-Policy','no-referrer')]
     status=200
     try:
         path=env.get('PATH_INFO','/')
         if not path.startswith('/api/'):
-            static={'/':'index.html','/app.js':'app.js','/hosting.js':'hosting.js','/style.css':'style.css','/logo.svg':'logo.svg'}
+            static={'/':'index.html','/app.js':'app.js','/hosting.js':'hosting.js','/files.js':'files.js','/file_editor.js':'file_editor.js','/style.css':'style.css','/logo.svg':'logo.svg'}
             if path not in static or env['REQUEST_METHOD']!='GET':
                 raise c.Problem('Not found.',404)
             file=c.ROOT/'frontend'/static[path]
@@ -289,7 +289,7 @@ def application(env, start_response):
         else:
             length=int(env.get('CONTENT_LENGTH') or 0)
             if length<0 or length>MAX_BODY:
-                raise c.Problem('Request too large (1 MB file limit).',413)
+                raise c.Problem('Request exceeds the JSON size limit.',413)
             body=json.loads(env['wsgi.input'].read(length)) if length else {}
             if not isinstance(body,dict):
                 raise c.Problem('Expected a JSON object.')

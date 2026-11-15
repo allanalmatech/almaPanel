@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.9",
+    "version": "0.1.0-alpha.10",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -2960,7 +2960,7 @@
     },
     "/accounts/{id}/files": {
       "get": {
-        "summary": "List directory; optional ?path=relative/path",
+        "summary": "List a directory under public_html",
         "description": "Permissions: Authorized active account",
         "security": [
           {
@@ -3088,8 +3088,8 @@
         ]
       },
       "post": {
-        "summary": "Operate on files under tenant UID",
-        "description": "Permissions: Authorized active account",
+        "summary": "Run a scoped File Manager or website backup operation",
+        "description": "Requires an authorized active account and CSRF. See API.md for action fields. Ordinary transfers allow 256 MiB and use 512 KiB chunks. Editor writes allow 1 MiB, with optional revision checking.",
         "security": [
           {
             "session": []
@@ -3101,7 +3101,9 @@
             "content": {
               "application/json": {
                 "example": {
-                  "message": "File saved."
+                  "upload_id": "0123456789abcdef0123456789abcdef",
+                  "offset": 0,
+                  "chunk_bytes": 524288
                 }
               }
             }
@@ -3298,9 +3300,9 @@
                 ]
               },
               "example": {
-                "action": "write",
-                "path": "index.html",
-                "content": "SGVsbG8="
+                "action": "upload_start",
+                "path": "assets/photo.png",
+                "size": 1310730
               }
             }
           }

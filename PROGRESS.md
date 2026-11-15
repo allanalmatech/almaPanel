@@ -213,3 +213,28 @@ the owner/group access on new account homes independently of the service umask.
 `make check` passed 75 tests. Chromium exercised the retry UI against the real
 WSGI API and showed the queued job for the same account. Live confirmation of
 the user's retried account and Linux PHP-FPM pool is pending.
+
+## 2026-11-15 · 0.1.0-alpha.10
+
+File Manager now has a folder tree and paged listing, recursive name search,
+individual transfer progress, a syntax-highlighted editor, image conversion
+and media and ZIP previews. The destination picker covers copying, moving,
+archiving, extracting and Trash restore. The partitioned file API builds
+on Linux account identities and descriptor-relative file access.
+
+The agent and frontend changes are in `agent/files.py`,
+`agent/file_tools.py`, `agent/uploads.py`, the scoped Files API and the
+new `frontend/files.js` and `frontend/file_editor.js` views.
+`TODO.md`, the feature matrix, user guides and OpenAPI record the new behavior.
+
+- `make check` passed 80 tests. The Chromium suite passed on the local
+  HTTPS WSGI application and a real filesystem fixture.
+- An unprivileged Linux CLI run uploaded 256 MiB and verified its checksum.
+  The encrypted restic website and DNS recovery tests also passed.
+- The installed-VM checklist now exercises multi-chunk upload, actual
+  tenant ownership, Nginx read access, ZIP extraction and Trash recovery.
+
+Browser and Linux acceptance results cover the evaluation build locally.
+Installed Amazon Linux and Ubuntu acceptance, maximum-size browser download
+and additional browser engines are open. The production release gate remains
+closed.

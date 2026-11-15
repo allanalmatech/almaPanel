@@ -115,6 +115,52 @@ secondary synchronization and DNSSEC remain separate work.
   Saving a previously existing domain refreshes its configuration to enable
   website request logging. Configure log rotation when deploying.
 
+## Working with website files
+
+Select your hosting account and open **File Manager**. Expand folders in the
+tree, click a folder in the current path, or enter a folder path relative to
+`public_html`. Search scans the current folder and its subfolders by name.
+**Show hidden files** applies to browsing and search. The list shows size,
+modified time, Linux owner and group, and Unix permissions.
+
+- Choose **New file** to open the source editor, or **New folder** to create a
+  directory. Click an existing text file to edit it. Select a highlighting
+  language and press **Save file** or use Ctrl+S (Cmd+S on macOS). A concurrent
+  saved change causes a revision conflict. Copy your unsaved text before
+  reopening the current file.
+- Drop files on the upload area or choose up to 50 at once. Watch progress
+  per file. A file appears at its destination after the full upload succeeds.
+  **Download** reconstructs the requested file from chunks of the same revision.
+- Use the row's **Actions** to copy, move, rename, change permissions, create
+  a ZIP or send an entry to Trash. The destination dialog can browse folders
+  and set a new name. Copy, move, upload and restore require an unused path.
+  Permission edits apply the ordinary owner/group/other bits. Check that
+  Nginx can still enter the parent folders and read files you want to serve.
+- Click a ZIP to list its files, or choose **Extract ZIP** to unpack it to a new
+  folder. **Zip folder** compresses the displayed folder. The row's
+  **Create ZIP** supports a single file or folder.
+- Open **Trash** to restore an entry to its original or another unused path,
+  or confirm permanent deletion. Trash remains private to the hosting account.
+- Click PNG, JPEG, GIF or WebP to preview it. Use the width, height and output
+  format controls to save a resized copy as PNG, JPEG or WebP. Animated GIF
+  conversion saves a still image. Supported audio and video files open with
+  browser playback controls. HTML and SVG open as source text.
+
+| Operation | Limit |
+|---|---|
+| Individual browser upload, download or file copy | 256 MiB |
+| Text editor | 1 MiB of UTF-8; live syntax highlighting up to 180,000 characters |
+| Media preview | 24 MiB and a codec supported by your browser |
+| Resized image output | 16 megapixels, with each dimension up to 8192 pixels |
+| ZIP and recursive copy | 64 MiB of content and 5,000 entries; ZIP32, single disk |
+| Folder listing and search | 5,000 entries scanned, 100 entries per listing page and 250 search results |
+| Upload staging | Four pending uploads and 512 MiB declared per account; stages expire after one hour of inactivity |
+
+Account storage usage comes from Linux and includes the account's private files.
+Upload completion requires space for both the private stage and the destination.
+Symlinks and hardlinked regular files cannot be opened, copied or extracted
+through the panel. The file controls work under the account's Linux UID.
+
 ## Acceptance on Amazon Linux 2023
 
 For a disposable VM, run the repository acceptance script after enabling the

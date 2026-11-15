@@ -3,6 +3,7 @@
 """Real Chromium + HTTPS + WSGI + SQLite test. No Linux service simulation.
 Requires playwright and Chromium. Screenshots are temporary QA output only.
 """
+import io
 import os
 import json
 from pathlib import Path
@@ -12,6 +13,10 @@ import subprocess
 import sys
 import tempfile
 import threading
+from unittest.mock import patch
+import wave
+import zlib
+import struct
 from wsgiref.simple_server import make_server,WSGIRequestHandler
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from playwright.sync_api import sync_playwright
@@ -94,27 +99,28 @@ with tempfile.TemporaryDirectory() as temp:
             private = Path(temp) / 'private'
             website.mkdir()
             (private / 'backups').mkdir(parents=True)
+            (private / 'trash').mkdir()
             (website / 'page.html').write_text('Back up this page.')
 
-            def backup_call(fields):
+            other_operations = c.rpc
+
+            def local_files(operation, **args):
+                if args.get('name') != 'browserhost' or operation not in ('files', 'account.stats'):
+                    return other_operations(operation, **args)
+                if operation == 'account.stats':
+                    return {'disk_bytes': sum(item.stat().st_size for item in website.rglob('*') if item.is_file())}
                 root = os.open(website, NOFOLLOW_DIR)
+                state = os.open(private, NOFOLLOW_DIR)
                 try:
-                    state = os.open(private, NOFOLLOW_DIR)
-                    try:
-                        return operate(root, fields, state)
-                    finally:
-                        os.close(state)
+                    return operate(root, args['request'], state)
+                except (OSError, ValueError) as error:
+                    raise c.Problem(str(error), 502) from error
                 finally:
+                    os.close(state)
                     os.close(root)
 
-            def browser_backup(route):
-                try:
-                    result = backup_call(route.request.post_data_json)
-                    route.fulfill(status=200, content_type='application/json', body=json.dumps(result))
-                except (OSError, ValueError) as error:
-                    route.fulfill(status=409, json={'error': str(error)})
-
-            page.route('**/api/accounts/*/files', browser_backup)
+            file_fixture = patch.object(c, 'rpc', side_effect=local_files)
+            file_fixture.start()
             page.locator('#nav a[href="#backups"]').click()
             page.get_by_role('button',name='Create website backup').click()
             page.get_by_role('button',name='Browse files').click()
@@ -126,6 +132,130 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button',name='Restore to path').click()
             page.get_by_text('Restored to recovered.html.',exact=True).wait_for()
             assert (website / 'recovered.html').read_text() == 'Back up this page.'
+
+            (website / 'assets' / 'icons').mkdir(parents=True)
+            (website / '.settings').write_text('visible when requested')
+            page.locator('#nav a[href="#files"]').click()
+            page.get_by_text('used in this account', exact=False).wait_for()
+            page.get_by_role('checkbox', name='Show hidden files').check()
+            page.get_by_role('button', name='.settings', exact=True).wait_for()
+            page.get_by_role('checkbox', name='Show hidden files').uncheck()
+            page.get_by_role('button', name='.settings', exact=True).wait_for(state='hidden')
+            tree = page.get_by_role('navigation', name='Folder tree')
+            tree.get_by_role('button', name='Expand assets', exact=True).click()
+            tree.get_by_role('button', name='icons', exact=True).click()
+            page.get_by_role('navigation', name='Current folder').get_by_role('button', name='icons').wait_for()
+
+            big_file = b'a' * 520000 + b'b' * 600000
+            php = b'\xef\xbb\xbf<?php\r\necho "before";\r\n'
+            page.locator('#upload').set_input_files([
+                {'name': 'large.bin', 'mimeType': 'application/octet-stream', 'buffer': big_file},
+                {'name': 'file.php', 'mimeType': 'text/plain', 'buffer': php},
+            ])
+            page.get_by_text('file.php · Uploaded', exact=True).wait_for()
+            folder = website / 'assets' / 'icons'
+            assert (folder / 'large.bin').read_bytes() == big_file
+            with page.expect_download() as download:
+                page.get_by_role('combobox', name='Action for large.bin').select_option('download')
+            assert download.value.path().read_bytes() == big_file
+            dropped = page.evaluate_handle('''() => {
+                const transfer = new DataTransfer();
+                transfer.items.add(new File(['dropped'], 'drop.txt', {type: 'text/plain'}));
+                return transfer;
+            }''')
+            page.locator('#drop-files').dispatch_event('drop', {'dataTransfer': dropped})
+            page.get_by_text('drop.txt · Uploaded', exact=True).wait_for()
+            assert (folder / 'drop.txt').read_text() == 'dropped'
+
+            page.get_by_role('button', name='file.php', exact=True).click()
+            page.locator('.source-editor .code-keyword').filter(has_text='echo').wait_for()
+            page.get_by_role('textbox', name='File contents').fill('<?php\necho "after";\n')
+            page.get_by_role('button', name='Save file', exact=True).click()
+            page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
+            assert (folder / 'file.php').read_bytes() == php.replace(b'before', b'after')
+            page.get_by_role('button', name='Close file', exact=True).click()
+            page.get_by_role('button', name='New file', exact=True).click()
+            dialog = page.get_by_role('dialog', name='New file', exact=True)
+            dialog.get_by_role('textbox', name='Name', exact=True).fill('created.txt')
+            dialog.get_by_role('button', name='Open editor', exact=True).click()
+            page.get_by_role('textbox', name='File contents').fill('created by File Manager')
+            page.get_by_role('button', name='Save file', exact=True).click()
+            page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
+            assert (folder / 'created.txt').read_text() == 'created by File Manager'
+            page.get_by_role('button', name='Close file', exact=True).click()
+            page.get_by_role('navigation', name='Current folder').get_by_role('button', name='public_html').click()
+            page.locator('#file-crumbs [aria-current=page]').get_by_text('public_html', exact=True).wait_for()
+            page.get_by_role('searchbox', name='Search this folder and its subfolders').fill('created')
+            page.get_by_role('button', name='Search', exact=True).click()
+            page.get_by_role('cell', name='assets/icons/created.txt', exact=True).wait_for()
+            page.get_by_role('textbox', name='Folder path').fill('assets/icons')
+            page.get_by_role('button', name='Go', exact=True).click()
+            page.get_by_role('combobox', name='Action for file.php').select_option('mode')
+            page.get_by_role('group', name='Owner').get_by_role('checkbox', name='Execute').check()
+            page.get_by_role('button', name='Save permissions', exact=True).click()
+            page.get_by_role('dialog', name='Change permissions').wait_for(state='hidden')
+            assert (folder / 'file.php').stat().st_mode & 0o100
+
+            page.get_by_role('combobox', name='Action for file.php').select_option('copy')
+            dialog = page.get_by_role('dialog', name='Copy file.php')
+            dialog.get_by_role('textbox', name='Name', exact=True).fill('copied.php')
+            dialog.get_by_role('button', name='Copy', exact=True).click()
+            page.get_by_role('combobox', name='Action for copied.php').select_option('rename')
+            dialog = page.get_by_role('dialog', name='Move or rename copied.php')
+            dialog.get_by_text('Browse folders', exact=True).click()
+            dialog.get_by_role('button', name='public_html', exact=True).click()
+            dialog.get_by_role('textbox', name='Name', exact=True).fill('moved.php')
+            dialog.get_by_role('button', name='Move', exact=True).click()
+            dialog.wait_for(state='hidden')
+            assert (website / 'moved.php').is_file() and not (folder / 'copied.php').exists()
+
+            page.get_by_role('combobox', name='Action for file.php').select_option('archive')
+            page.get_by_role('dialog').get_by_role('button', name='Create ZIP', exact=True).click()
+            page.get_by_role('button', name='file.php.zip', exact=True).click()
+            page.get_by_text('1 file in this ZIP', exact=True).wait_for()
+            page.get_by_role('combobox', name='Action for file.php.zip').select_option('extract')
+            dialog = page.get_by_role('dialog', name='Extract file.php.zip')
+            dialog.get_by_role('textbox', name='Name', exact=True).fill('unpacked')
+            dialog.get_by_role('button', name='Extract', exact=True).click()
+            dialog.wait_for(state='hidden')
+            assert (folder / 'unpacked' / 'file.php').read_bytes() == (folder / 'file.php').read_bytes()
+
+            def png_chunk(kind, data):
+                return struct.pack('!I', len(data)) + kind + data + struct.pack('!I', zlib.crc32(kind + data))
+
+            picture = b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', struct.pack('!IIBBBBB', 1, 1, 8, 2, 0, 0, 0))
+            picture += png_chunk(b'IDAT', zlib.compress(b'\0\1\2\3')) + png_chunk(b'IEND', b'')
+            (folder / 'photo.png').write_bytes(picture)
+            audio = io.BytesIO()
+            with wave.open(audio, 'wb') as wav:
+                wav.setparams((1, 1, 8000, 0, 'NONE', 'not compressed'))
+                wav.writeframes(bytes([128]) * 800)
+            (folder / 'tone.wav').write_bytes(audio.getvalue())
+            page.get_by_role('button', name='Reload', exact=True).click()
+            page.get_by_role('button', name='photo.png', exact=True).click()
+            page.get_by_role('spinbutton', name='Width (pixels)').fill('3')
+            page.get_by_role('combobox', name='Output format').select_option('webp')
+            page.get_by_role('button', name='Save image copy', exact=True).click()
+            page.get_by_text('Image saved.', exact=True).wait_for()
+            assert (folder / 'photo-resized.webp').read_bytes()[8:12] == b'WEBP'
+            assert (folder / 'photo.png').read_bytes() == picture
+            page.get_by_role('button', name='tone.wav', exact=True).click()
+            page.wait_for_function("() => document.querySelector('audio')?.readyState >= 1")
+
+            page.get_by_role('combobox', name='Action for drop.txt').select_option('trash')
+            page.get_by_role('button', name='Confirm', exact=True).click()
+            page.get_by_role('button', name='drop.txt', exact=True).wait_for(state='hidden')
+            page.get_by_role('link', name='Trash', exact=True).click()
+            page.get_by_role('button', name='Restore', exact=True).click()
+            page.get_by_role('button', name='Restore entry', exact=True).click()
+            page.get_by_text('Entry restored.', exact=True).wait_for()
+            assert (folder / 'drop.txt').read_text() == 'dropped'
+            page.set_viewport_size({'width': 412, 'height': 860})
+            page.evaluate("() => { location.hash = 'files'; }")
+            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            assert page.evaluate('() => document.documentElement.scrollWidth === document.documentElement.clientWidth')
+            page.set_viewport_size({'width': 1440, 'height': 1000})
+            file_fixture.stop()
             offsite_status = {'state': 'succeeded', 'message': 'Encrypted website snapshot saved.'}
 
             def browser_offsite(route):
@@ -192,6 +322,6 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('heading',name='Sign in to your account').wait_for()
             assert not errors, errors
             browser.close()
-            print('Browser acceptance passed for account setup, mail, ZIP restore, off-site status, DNS draft recovery, preferences and navigation.')
+            print('Browser acceptance passed for account setup and retry, file uploads/downloads, editing, ZIP, images, Trash, mobile navigation, mail, backups, DNS and preferences.')
     finally:
         server.shutdown();thread.join();os.environ.pop('ALMA_ORIGIN',None)

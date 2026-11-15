@@ -3,21 +3,27 @@
 import base64
 from contextlib import contextmanager
 import ctypes
+import grp
+import io
 import json
 import os
 from pathlib import PurePosixPath
+import pwd
 import re
 import secrets
 import shutil
 import stat
+import struct
 import zipfile
 import zlib
 
 CHUNK = 512 * 1024
 MAX_BYTES = 64 * 1024 * 1024
+TRANSFER_BYTES = 256 * 1024 * 1024
 BACKUP_BYTES = 128 * 1024 * 1024
 MAX_ENTRIES = 5000
 MAX_DEPTH = 24
+ZIP_DIRECTORY_BYTES = 16 * 1024 * 1024
 BACKUP_PAGE_SIZE = 75
 BACKUP_NAME = re.compile(r'(?:website|scheduled)-[a-f0-9]{16}\.zip\Z')
 BACKUP_ACTIONS = {
@@ -35,6 +41,8 @@ def components(path):
     if PurePosixPath(path).is_absolute() or any(part in ('.', '..') for part in path.split('/')):
         raise ValueError('Path must stay inside public_html.')
     parts = [part for part in path.split('/') if part]
+    if any(part.startswith('.alma-') for part in parts):
+        raise ValueError('This path is reserved for file operations.')
     if len(parts) > MAX_DEPTH:
         raise ValueError('Directory nesting limit exceeded.')
     return parts
@@ -67,6 +75,31 @@ def regular(fd):
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
         raise ValueError('Only regular, non-hardlinked files are supported.')
     return info
+
+
+def stat_entry(parent, name):
+    try:
+        return os.stat(name, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+
+
+def unlink_if_present(parent, name):
+    try:
+        os.unlink(name, dir_fd=parent)
+    except FileNotFoundError:
+        pass
+
+
+@contextmanager
+def staged_output(parent):
+    temporary = '.alma-' + secrets.token_hex(16)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o640, dir_fd=parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            yield temporary, stream
+    finally:
+        unlink_if_present(parent, temporary)
 
 
 def move_entry(source_fd, source, target_fd, target):
@@ -107,11 +140,58 @@ def entries(fd):
         for entry in listing:
             if entry.name.startswith('.alma-'):
                 continue
-            yield entry.name, entry.stat(follow_symlinks=False)
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            yield entry.name, info
 
 
-def tree(root, parts, query):
-    if not isinstance(query, str) or len(query) > 120:
+def list_directory(root, parts, request, *, paged):
+    offset = request.get('offset', 0)
+    include_hidden = request.get('include_hidden', not paged)
+    folders_only = request.get('folders_only', False)
+    if (type(offset) is not int or not 0 <= offset <= MAX_ENTRIES
+            or type(include_hidden) is not bool or type(folders_only) is not bool):
+        raise ValueError('Invalid folder listing options.')
+    result = []
+    with folder(root, parts) as parent:
+        for index, (name, info) in enumerate(entries(parent)):
+            if index >= MAX_ENTRIES:
+                raise ValueError('Directory exceeds the 5,000-entry browsing limit.')
+            is_dir = stat.S_ISDIR(info.st_mode)
+            if (include_hidden or not name.startswith('.')) and (not folders_only or is_dir):
+                result.append((name, info))
+    result.sort(key=lambda row: (not stat.S_ISDIR(row[1].st_mode), row[0].casefold(), row[0]))
+    size = len(result)
+    page = result[offset:offset + 100] if paged else result
+    users, groups = {}, {}
+    items = []
+    for name, info in page:
+        if info.st_uid not in users:
+            try:
+                users[info.st_uid] = pwd.getpwuid(info.st_uid).pw_name
+            except KeyError:
+                users[info.st_uid] = str(info.st_uid)
+        if info.st_gid not in groups:
+            try:
+                groups[info.st_gid] = grp.getgrgid(info.st_gid).gr_name
+            except KeyError:
+                groups[info.st_gid] = str(info.st_gid)
+        items.append({'name': name, 'size': info.st_size, 'mode': oct(stat.S_IMODE(info.st_mode)),
+                      'uid': info.st_uid, 'gid': info.st_gid, 'owner': users[info.st_uid],
+                      'group': groups[info.st_gid], 'modified': int(info.st_mtime),
+                      'directory': stat.S_ISDIR(info.st_mode), 'symlink': stat.S_ISLNK(info.st_mode),
+                      'regular': stat.S_ISREG(info.st_mode) and info.st_nlink == 1})
+    if not paged:
+        return items
+    next_offset = offset + len(items)
+    return {'path': '/'.join(parts), 'entries': items, 'total': size,
+            'next_offset': next_offset if next_offset < size else None}
+
+
+def tree(root, parts, query, include_hidden=True):
+    if not isinstance(query, str) or len(query) > 120 or type(include_hidden) is not bool:
         raise ValueError('Enter a search of at most 120 characters.')
     budget = Budget()
     matches = []
@@ -120,11 +200,13 @@ def tree(root, parts, query):
     def visit(fd, prefix):
         nonlocal truncated
         for name, info in entries(fd):
-            relative = [*prefix, name]
             if budget.count >= MAX_ENTRIES or len(matches) >= 250:
                 truncated = True
                 return
             budget.entry(0)
+            if not include_hidden and name.startswith('.'):
+                continue
+            relative = [*prefix, name]
             is_dir = stat.S_ISDIR(info.st_mode)
             if query.casefold() in name.casefold():
                 matches.append({'path': '/'.join(relative), 'directory': is_dir,
@@ -143,28 +225,39 @@ def tree(root, parts, query):
 
 def zip_tree(archive, fd, prefix, budget):
     for name, info in entries(fd):
-        relative = [*prefix, name]
-        budget.entry(len(relative))
-        path = '/'.join(relative)
-        if len(path) > 2048 or ':' in name or '\\' in name or any(ord(char) < 32 for char in name):
-            raise ValueError('ZIP cannot represent one of these file names safely.')
-        if stat.S_ISDIR(info.st_mode):
-            archive.writestr(path + '/', b'')
-            with folder(fd, [name]) as child:
-                zip_tree(archive, child, relative, budget)
-        elif stat.S_ISREG(info.st_mode):
-            with os.fdopen(os.open(name, NOFOLLOW_FILE, dir_fd=fd), 'rb') as source:
-                regular(source.fileno())
-                with archive.open(path, 'w') as target:
-                    copy_bytes(source, target, budget)
-        else:
-            raise ValueError('Archive source contains a symlink or special file.')
+        zip_entry(archive, fd, [*prefix, name], info, budget)
 
 
-def write_zip(source, output, max_bytes, *, compress=True):
+def zip_entry(archive, parent, relative, info, budget):
+    name = relative[-1]
+    budget.entry(len(relative))
+    path = '/'.join(relative)
+    if len(path) > 2048 or ':' in name or '\\' in name or any(ord(char) < 32 for char in name):
+        raise ValueError('ZIP cannot represent one of these file names safely.')
+    if stat.S_ISDIR(info.st_mode):
+        archive.writestr(path + '/', b'')
+        with folder(parent, [name]) as child:
+            zip_tree(archive, child, relative, budget)
+    elif stat.S_ISREG(info.st_mode):
+        with os.fdopen(os.open(name, NOFOLLOW_FILE, dir_fd=parent), 'rb') as source:
+            original = regular(source.fileno())
+            with archive.open(path, 'w') as target:
+                copy_bytes(source, target, budget)
+            if revision_of(regular(source.fileno())) != revision_of(original):
+                raise ValueError('A file changed during compression.')
+    else:
+        raise ValueError('Archive source contains a symlink or special file.')
+
+
+def write_zip(source, output, max_bytes, *, compress=True, item=None):
     mode = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
+    budget = Budget(max_bytes)
     with zipfile.ZipFile(output, 'w', compression=mode, compresslevel=3) as archive:
-        zip_tree(archive, source, [], Budget(max_bytes))
+        if item:
+            name, info = item
+            zip_entry(archive, source, [name], info, budget)
+        else:
+            zip_tree(archive, source, [], budget)
     output.flush()
     os.fsync(output.fileno())
     if output.tell() > max_bytes + 2 * 1024 * 1024:
@@ -176,20 +269,18 @@ def archive_tree(source_root, source_parts, target_root, target_parts, *, privat
         raise ValueError('Choose a new .zip destination.')
     if source_root == target_root and source_parts == target_parts[:len(source_parts)] and source_parts:
         raise ValueError('Save the ZIP outside the source folder.')
-    tmp = '.alma-' + secrets.token_hex(12)
-    with folder(source_root, source_parts) as source, folder(target_root, target_parts[:-1]) as target:
-        fd = os.open(tmp, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o640, dir_fd=target)
-        try:
-            with os.fdopen(fd, 'w+b') as output:
-                if private:
-                    os.fchmod(output.fileno(), 0o600)
-                write_zip(source, output, max_bytes)
-            move_entry(target, tmp, target, target_parts[-1])
-        finally:
-            try:
-                os.unlink(tmp, dir_fd=target)
-            except FileNotFoundError:
-                pass
+    with folder(target_root, target_parts[:-1]) as target, staged_output(target) as (tmp, output):
+        if private:
+            os.fchmod(output.fileno(), 0o600)
+        with folder(source_root, source_parts[:-1]) as parent:
+            leaf = source_parts[-1] if source_parts else None
+            info = os.stat(leaf, dir_fd=parent, follow_symlinks=False) if leaf else os.fstat(parent)
+            if leaf and not stat.S_ISDIR(info.st_mode):
+                write_zip(parent, output, max_bytes, item=(leaf, info))
+            else:
+                with folder(parent, [leaf] if leaf else []) as source:
+                    write_zip(source, output, max_bytes)
+        move_entry(target, tmp, target, target_parts[-1])
     return {'message': 'ZIP archive created.', 'name': target_parts[-1]}
 
 
@@ -260,31 +351,85 @@ def staged_folder(root, target_parts, populate):
                 shutil.rmtree(tmp, dir_fd=parent)
 
 
+def check_zip_directory(file, size):
+    # PKWARE APPNOTE sections 4.3.12 and 4.3.16. Bound the central directory
+    # before the ZIP library constructs a ZipInfo for every archive member.
+    trailer = struct.Struct('<4s4H2IH')
+    tail_size = min(size, trailer.size + 65535)
+    file.seek(size - tail_size)
+    tail = file.read(tail_size)
+    end = tail.rfind(b'PK\x05\x06')
+    if end < 0 or len(tail) - end < trailer.size:
+        raise ValueError('Invalid ZIP end record.')
+    _, disk, first, disk_entries, count, length, start, comment = trailer.unpack_from(tail, end)
+    if (disk or first or disk_entries != count or end + trailer.size + comment != len(tail)
+            or length > ZIP_DIRECTORY_BYTES or start + length != size - tail_size + end
+            or count > MAX_ENTRIES):
+        raise ValueError('ZIP directory is unsupported or exceeds its limits.')
+    file.seek(start)
+    remaining = length
+    for _ in range(count):
+        header = file.read(46)
+        if len(header) != 46 or header[:4] != b'PK\x01\x02':
+            raise ValueError('Invalid ZIP directory entry.')
+        skip = sum(struct.unpack_from('<HHH', header, 28))
+        remaining -= 46 + skip
+        if remaining < 0:
+            raise ValueError('Invalid ZIP directory entry length.')
+        file.seek(skip, os.SEEK_CUR)
+    if remaining:
+        raise ValueError('ZIP directory entry count does not match.')
+
+
+class ZipInput(io.BufferedReader):
+    def read(self, size=-1):
+        # Bound reads even if a tenant changes the archive after preflight.
+        if size < 0:
+            size = max(0, os.fstat(self.fileno()).st_size - self.tell())
+        if size > ZIP_DIRECTORY_BYTES:
+            raise ValueError('ZIP read exceeds the directory size limit.')
+        return super().read(size)
+
+
 @contextmanager
 def open_zip(root, parts, max_bytes):
     if not parts:
         raise ValueError('Select a ZIP file.')
     with folder(root, parts[:-1]) as parent:
         fd = os.open(parts[-1], NOFOLLOW_FILE, dir_fd=parent)
-    with os.fdopen(fd, 'rb') as file:
+    with ZipInput(os.fdopen(fd, 'rb', buffering=0)) as file:
         original = regular(file.fileno())
         if original.st_size > max_bytes + 2 * 1024 * 1024:
             raise ValueError('ZIP file exceeds the size limit.')
         try:
+            check_zip_directory(file, original.st_size)
             with zipfile.ZipFile(file) as archive:
+                if revision_of(regular(file.fileno())) != revision_of(original):
+                    raise ValueError('ZIP changed while opening it.')
                 yield archive, file, original
         except (zipfile.BadZipFile, EOFError, RuntimeError, NotImplementedError, zlib.error) as exc:
             raise ValueError('Invalid, damaged or unsupported ZIP archive.') from exc
 
 
+def archive_contents(root, parts, request):
+    with open_zip(root, parts, MAX_BYTES) as (archive, _, info):
+        revision = revision_of(info)
+        if request.get('revision') and request['revision'] != revision:
+            raise ValueError('ZIP changed while browsing it.')
+        files = backup_index(archive, max_bytes=MAX_BYTES)
+        return backup_contents(files, request, revision)
+
+
 def extract_zip(source_root, source_parts, root, target_parts, *, max_bytes=MAX_BYTES, prepare=None):
 
     def unpack(destination):
-        with open_zip(source_root, source_parts, max_bytes) as (archive, _, _):
+        with open_zip(source_root, source_parts, max_bytes) as (archive, source, original):
             budget = Budget(max_bytes)
             seen = set()
             for item in archive.infolist():
                 unpack_member(archive, item, destination, budget, seen)
+            if revision_of(regular(source.fileno())) != revision_of(original):
+                raise ValueError('ZIP changed during extraction.')
         if prepare:
             prepare(destination)
 
@@ -322,28 +467,48 @@ def revision_of(info):
     return f'{info.st_ino}:{info.st_size}:{info.st_mtime_ns}:{info.st_ctime_ns}'
 
 
-def read_chunk(root, parts, request, *, max_bytes=MAX_BYTES):
+def read_chunk(root, parts, request, *, max_bytes=MAX_BYTES, extra_bytes=2 * 1024 * 1024):
     offset = request.get('offset', 0)
-    if not parts or type(offset) is not int or not 0 <= offset <= max_bytes + 2 * 1024 * 1024:
+    if not parts or type(offset) is not int or not 0 <= offset <= max_bytes + extra_bytes:
         raise ValueError('Invalid download offset.')
     with folder(root, parts[:-1]) as parent:
         fd = os.open(parts[-1], NOFOLLOW_FILE, dir_fd=parent)
     with os.fdopen(fd, 'rb') as source:
         info = regular(source.fileno())
-        if info.st_size > max_bytes + 2 * 1024 * 1024:
+        if info.st_size > max_bytes + extra_bytes:
             raise ValueError('File exceeds the download limit.')
         revision = revision_of(info)
-        if offset and request.get('revision') != revision:
+        if (offset or request.get('revision')) and request.get('revision') != revision:
             raise ValueError('File changed during download.')
         source.seek(offset)
         data = source.read(CHUNK)
+        if revision_of(regular(source.fileno())) != revision:
+            raise ValueError('File changed during download.')
         return {'content': base64.b64encode(data).decode(), 'size': info.st_size,
                 'revision': revision, 'done': offset + len(data) >= info.st_size}
 
 
-def backup_index(archive):
+def copy_file(root, source_parts, target_parts):
+    if not source_parts or not target_parts:
+        raise ValueError('Choose a source file and an unused path.')
+    with folder(root, source_parts[:-1]) as parent, folder(root, target_parts[:-1]) as target:
+        with os.fdopen(os.open(source_parts[-1], NOFOLLOW_FILE, dir_fd=parent), 'rb') as source:
+            info = regular(source.fileno())
+            if info.st_size > TRANSFER_BYTES:
+                raise ValueError('File exceeds the 256 MiB copy limit.')
+            with staged_output(target) as (temporary, stream):
+                copy_bytes(source, stream, Budget(TRANSFER_BYTES))
+                stream.flush()
+                os.fsync(stream.fileno())
+                if revision_of(regular(source.fileno())) != revision_of(info):
+                    raise ValueError('File changed during copy.')
+                move_entry(target, temporary, target, target_parts[-1])
+    return {'message': 'File copied.'}
+
+
+def backup_index(archive, *, max_bytes=BACKUP_BYTES):
     items = archive.infolist()
-    if len(items) > MAX_ENTRIES or sum(item.file_size for item in items) > BACKUP_BYTES:
+    if len(items) > MAX_ENTRIES or sum(item.file_size for item in items) > max_bytes:
         raise ValueError('Backup exceeds its unpacked content or entry limit.')
     members = {}
     for item in items:

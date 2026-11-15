@@ -93,6 +93,8 @@ class API(unittest.TestCase):
         self.assertEqual([x['id'] for x in self.request('/api/accounts')['body']],[a])
         for suffix in ['stats','files','domains']:
             self.assertEqual(self.request(f'/api/accounts/{b}/{suffix}')['status'],404)
+        self.assertEqual(self.request(f'/api/accounts/{b}/files',
+                                      {'action': 'upload_start', 'path': 'new.png', 'size': 1})['status'], 404)
         self.assertEqual(self.request('/api/audit')['status'],403)
         self.assertEqual(self.request('/api/system')['status'],403)
         self.assertEqual(self.request('/api/accounts',{})['status'],403)
@@ -183,10 +185,13 @@ class Files(unittest.TestCase):
         self.write('file')
         self.op('chmod', 'file', mode='600')
         self.assertEqual((self.root/'file').stat().st_mode & 0o777, 0o600)
+        self.op('chmod', 'file', mode='000')
+        self.op('chmod', 'file', mode='664')
+        self.assertEqual((self.root/'file').stat().st_mode & 0o777, 0o664)
         with self.assertRaises(ValueError):
-            self.op('chmod', 'file', mode='777')
+            self.op('chmod', 'file', mode='4777')
         (self.root/'link').symlink_to(self.root/'file')
-        with self.assertRaises(OSError):
+        with self.assertRaises(ValueError):
             self.op('chmod', 'link', mode='644')
         os.link(self.root/'file', self.root/'hardlink')
         with self.assertRaises(ValueError):

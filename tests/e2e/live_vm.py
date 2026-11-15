@@ -89,6 +89,26 @@ except urllib.error.HTTPError as e:
 else:
     raise AssertionError('A different tenant browsed another account’s backup.')
 csrf = call('/login', {'username':'vmadmin','password':password})['csrf']
+files = account_url + '/files'
+data = b'website sample\n' * 82000
+init = call(files, {'action': 'upload_start', 'path': 'next/probe.txt', 'size': len(data)})
+for offset in range(0, len(data), init['chunk_bytes']):
+    part = data[offset:offset + init['chunk_bytes']]
+    reply = call(files, {'action': 'upload_chunk', 'upload_id': init['upload_id'], 'offset': offset,
+                         'content': base64.b64encode(part).decode()})
+    assert reply['offset'] == offset + len(part)
+call(files, {'action': 'upload_finish', 'upload_id': init['upload_id']})
+with urllib.request.urlopen(urllib.request.Request('http://127.0.0.1/probe.txt', headers=req.headers)) as response:
+    assert response.read() == data
+listed = call(files, {'action': 'list_page', 'path': 'next'})
+assert next(item for item in listed['entries'] if item['name'] == 'probe.txt')['owner'] == 'ap_vmtenant'
+call(files, {'action': 'archive', 'path': 'next/probe.txt', 'destination': 'probe.zip'})
+call(files, {'action': 'extract', 'path': 'probe.zip', 'destination': 'probe'})
+call(files, {'action': 'trash', 'path': 'probe/probe.txt'})
+trashed = next(entry for entry in call(files, {'action': 'trash_list'}) if entry['path'] == 'probe/probe.txt')
+call(files, {'action': 'trash_restore', 'id': trashed['id'], 'destination': 'next/restored.txt'})
+assert Path('/srv/almapanel/accounts/vmtenant/public_html/next/restored.txt').read_bytes() == data
+print('Live file manager acceptance passed for multi-chunk upload, tenant ownership, Nginx access, ZIP and Trash.')
 database_probes = []
 for engine in call(account_url + '/databases')['engines']:
     fields = {'action':'create','engine':engine,'label':'probe'+engine}

@@ -108,3 +108,18 @@ administrator API and queries the active BIND service. The VM run is pending.
 Locally, the restic test checks the recovered record set and can pass it to
 `named-checkzone` when `ALMA_TEST_NAMED_CHECKZONE` is set. The browser test
 checks draft import and rejects a backup for a different domain.
+
+## Alpha.10 File Manager acceptance
+
+`make check` exercises tenant boundaries, upload replay and collision
+handling, partial uploads, revision checks, file permissions, paged metadata
+and ZIP/Trash operations with actual files. The Chromium suite uses the live
+WSGI application and an isolated filesystem fixture for the agent operation
+boundary. It exercises the folder tree, keyboard-accessible controls, file
+transfers, source editing, permissions, ZIP, image conversion, audio preview,
+Trash restore and a mobile viewport.
+
+An unprivileged Linux CLI run uploaded 256 MiB in 512 chunks and verified
+the published file's SHA-256 checksum. The installed Amazon Linux and Ubuntu
+VM tests still need to verify the service UID, ACLs and exposure through Nginx.
+`tests/e2e/live_vm.py` contains those File Manager checks for a disposable VM.

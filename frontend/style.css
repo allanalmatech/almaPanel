@@ -4,10 +4,67 @@
 .drop-zone{border:1px dashed var(--border,#8795a8);padding:1rem;margin:1rem 0;border-radius:.5rem}
 .drop-zone.dropping{outline:2px solid #477dc0}
 .file-preview{display:block;max-width:100%;max-height:32rem;object-fit:contain}
-.code-area{min-height:18rem;font-family:ui-monospace,monospace}
-#source-preview{background:#162335;color:#f2f5fa;padding:1rem;overflow:auto;max-height:28rem}
-.source-token{color:#a7d7ff}
 .panel textarea{min-width:0;width:100%}
 .hosting-log{max-height:25rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .top-link{font-weight:600;font-size:.85rem;white-space:nowrap}
 @media(max-width:700px){.top-link{display:none}}
+
+/* Website file browser and editable source highlighting. */
+.file-layout{display:grid;grid-template-columns:minmax(154px,190px) minmax(0,1fr);gap:12px;align-items:start}
+.file-layout .panel{padding:13px}
+.file-folders{min-width:0}
+.file-folders h2{margin:0 0 7px}
+.file-folders p{margin:12px 0 4px}
+.folder-tree,.folder-tree ul{list-style:none;margin:0;padding:0}
+.folder-tree ul{padding-left:11px;border-left:1px solid var(--line);margin-left:10px}
+.folder-tree li{min-width:0}
+.folder-tree li.muted{font-size:12px;padding:3px 6px}
+.folder-node{display:flex;align-items:center;gap:3px;margin:2px 0}
+.folder-node button{padding:3px 5px;font-size:12px}
+.folder-node button.folder-toggle{min-width:22px}
+.folder-node .folder-name{background:transparent;color:var(--ink);text-align:left;overflow-wrap:anywhere}
+.folder-node [aria-current],.file-crumbs [aria-current]{background:var(--pale);color:var(--ink)}
+#file-tree,.file-picker{max-height:330px;overflow:auto;padding:5px}
+.file-browser{min-width:0}
+.file-crumbs{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:0 0 10px}
+.file-crumbs button,.file-tools button{font-size:12px;padding:6px 8px}
+.file-location{display:flex;align-items:end;gap:8px;max-width:none;margin-bottom:10px}
+.file-location label{flex:1;min-width:0}
+.file-list-header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.file-list-header #file-page-status{color:var(--muted);margin:4px 0}
+.file-check{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.file-check input{width:auto;min-width:0;margin:0}
+.file-actions{min-width:116px;font-size:12px;padding:4px 5px}
+.file-dialog{width:min(94vw,460px)}
+.file-dialog h2,.file-dialog p{margin:0}
+.file-dialog .actions{justify-content:end;margin:0}
+.file-dialog .file-error{color:var(--ink)}
+.file-dialog [type=submit]{min-width:108px}
+.file-mode{display:flex;flex-wrap:wrap;gap:12px;border:1px solid var(--line)}
+.file-open{border-top:1px solid var(--line);margin-top:16px;padding-top:13px}
+.file-open-head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.file-open-head h2{overflow-wrap:anywhere}
+.file-open-head button{white-space:nowrap}
+.file-editor-form{max-width:none;gap:5px}
+.file-editor-form .toolbar{margin-bottom:3px}
+.file-editor-form .toolbar label{display:flex;align-items:center}
+.file-editor-form .toolbar select{font-size:12px}
+.source-editor{position:relative;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.source-editor textarea,.source-editor pre{display:block;width:100%;margin:0;padding:12px;
+    font:13px/1.55 ui-monospace,"Liberation Mono",Consolas,monospace;font-variant-ligatures:none;
+    font-synthesis:none;tab-size:4;white-space:pre;overflow-wrap:normal;border:0}
+.source-editor textarea{position:relative;height:23rem;resize:vertical;background:transparent}
+.source-editor pre{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.source-editor pre code{font:inherit;color:var(--ink)}
+.source-editor.highlighted textarea{color:transparent;caret-color:var(--ink)}
+.source-editor.highlighted textarea::selection{background:#5277af55;color:transparent}
+.code-keyword{color:#6540a5}.code-string{color:#176638}.code-comment{color:#526780}
+.code-number{color:#98472d}.code-element{color:#145e9c}
+.dark .code-keyword{color:#c9a9fd}.dark .code-string{color:#9adcaa}.dark .code-comment{color:#a8bcd5}
+.dark .code-number{color:#ffb08d}.dark .code-element{color:#9eceff}
+.file-open audio{width:min(100%,480px)}
+.image-tools{margin-top:12px}
+#file-transfers ul{padding-left:20px;margin-bottom:0;overflow-wrap:anywhere}
+#file-transfers button{margin-top:8px}
+@media(max-width:950px){.file-layout{grid-template-columns:minmax(0,1fr)}#file-tree{max-height:220px}}
+@media(forced-colors:active){.source-editor pre{display:none}.source-editor.highlighted textarea{color:CanvasText}}

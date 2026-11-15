@@ -79,3 +79,11 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Set account-directory permissions explicitly under the agent's restrictive umask.
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
+
+## 0.1.0-alpha.10
+
+- Add a nested, paged folder browser, ownership and real account storage usage.
+- Upload multiple files up to 256 MiB each with progress, cancellation, retryable chunks and atomic publication.
+- Add an editable syntax-highlighted source view with revision checks.
+- Preview media and ZIPs, resize and convert raster images, and browse destinations for file operations.
+- Test file workflows in Chromium and validate transfer and archive limits on Linux.
