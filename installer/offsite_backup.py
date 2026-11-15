@@ -18,9 +18,9 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from agent import databases
-from backend.core import Problem, name
-from installer import offsite_database
+from agent import databases, dns
+from backend.core import Problem, domain, name
+from installer import offsite_database, offsite_dns
 from installer.backup_stream import stream
 
 CONFIG = Path('/etc/almapanel/offsite-backup')
@@ -37,7 +37,7 @@ SFTP = re.compile(r'sftp://[a-zA-Z0-9_][a-zA-Z0-9_.-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*
 SNAPSHOT = re.compile(r'[a-f0-9]{64}\Z')
 ARCHIVE_LIMIT = 130 * 1024 * 1024
 MANIFEST = 'almapanel-websites.json'
-MANIFEST_LIMIT = 256 * 1024
+MANIFEST_LIMIT = 8 * 1024 * 1024
 
 
 def protected(path, owner, *, directory=False):
@@ -136,7 +136,7 @@ def capture_site(account, target):
                        umask=0o077, check=True, timeout=120)
 
 
-def website_snapshot(settings, state, inventory, capture=capture_site, progress=None, *, database_plan=()):
+def hosting_snapshot(settings, state, inventory, capture=capture_site, progress=None, *, database_plan=()):
     stage = state / 'upload'
     if stage.exists() or stage.is_symlink():
         protected(stage, os.geteuid(), directory=True)
@@ -167,12 +167,17 @@ def website_snapshot(settings, state, inventory, capture=capture_site, progress=
                 raise ValueError('Keep at least 256 MiB free for database backup staging.')
             print(f'Preparing the database dump for {db["account"]}/{db["label"]}.', flush=True)
             entries.append(offsite_database.dump(db, password, stage / offsite_database.archive_path(db)))
-        metadata = {'format': 2, 'host': settings[2], 'scope': 'websites-and-enrolled-databases',
-                    'accounts': sites, 'databases': entries}
-        (stage / MANIFEST).write_text(json.dumps(metadata, indent=2) + '\n')
+        zones = offsite_dns.capture(stage, inventory, sites, progress)
+        metadata = {'format': 3, 'host': settings[2], 'scope': 'managed-hosting',
+                    'accounts': sites, 'databases': entries, 'zones': zones}
+        payload = json.dumps(metadata, indent=2) + '\n'
+        if len(payload.encode()) > MANIFEST_LIMIT:
+            raise ValueError('The snapshot inventory exceeds its size limit.')
+        (stage / MANIFEST).write_text(payload)
         if progress:
             progress('running', 'Uploading the encrypted snapshot.')
         run_restic(settings, 'backup', '--host', settings[2], '--tag', TAG, '--', str(stage))
+        return {'websites': len(sites), 'databases': database_total, 'zones': len(zones)}
     finally:
         shutil.rmtree(stage)
 
@@ -217,7 +222,7 @@ def require_snapshot(settings, state, identifier):
     if not SNAPSHOT.fullmatch(identifier):
         raise ValueError('Provide the full snapshot ID. List snapshot IDs with the list command.')
     if not any(item['id'] == identifier for item in snapshots(settings, state)):
-        raise ValueError('Snapshot is outside this host’s website backup set.')
+        raise ValueError('Snapshot is outside this host’s backup set.')
 
 
 def stage_member(settings, state, identifier, member, limit):
@@ -240,28 +245,62 @@ def restore(settings, state, identifier, account):
     return stage_member(settings, state, identifier, Path(f'{account}.zip'), ARCHIVE_LIMIT)
 
 
-def snapshot_databases(settings, state, identifier):
+def read_manifest(settings, state, identifier):
     require_snapshot(settings, state, identifier)
     with tempfile.TemporaryFile() as output:
         download_member(settings, state, identifier, Path(MANIFEST), output, MANIFEST_LIMIT)
         output.seek(0)
         manifest = json.load(output)
-    if not isinstance(manifest, dict) or manifest.get('host') != settings[2] or manifest.get('format') not in (1, 2):
+    if (not isinstance(manifest, dict) or manifest.get('host') != settings[2]
+            or type(manifest.get('format')) is not int or manifest['format'] not in (1, 2, 3)):
         raise ValueError('This snapshot has an incompatible backup manifest.')
+    return manifest
+
+
+def manifest_file(entry, limit):
+    return (isinstance(entry, dict) and type(entry.get('size')) is int and 1 <= entry['size'] <= limit
+            and isinstance(entry.get('sha256'), str) and SNAPSHOT.fullmatch(entry['sha256']) is not None)
+
+
+def snapshot_databases(settings, state, identifier):
+    manifest = read_manifest(settings, state, identifier)
     if manifest['format'] == 1:
         return []
     entries = manifest.get('databases')
     if not isinstance(entries, list) or len(entries) > 100 * databases.MAX_DATABASES:
         raise ValueError('This snapshot has an invalid database manifest.')
     for item in entries:
-        if (not isinstance(item, dict) or not isinstance(item.get('engine'), str)
-                or item['engine'] not in offsite_database.DB_SUFFIX or type(item.get('size')) is not int
-                or not 1 <= item['size'] <= offsite_database.DB_LIMIT or not isinstance(item.get('sha256'), str)
-                or not SNAPSHOT.fullmatch(item['sha256'])):
+        if (not manifest_file(item, offsite_database.DB_LIMIT) or not isinstance(item.get('engine'), str)
+                or item['engine'] not in offsite_database.DB_SUFFIX):
             raise ValueError('This snapshot has an invalid database manifest entry.')
         name(item.get('account'))
         databases.label(item.get('label'))
     return entries
+
+
+def snapshot_zones(settings, state, identifier):
+    manifest = read_manifest(settings, state, identifier)
+    if manifest['format'] < 3:
+        return []
+    zones = manifest.get('zones')
+    if not isinstance(zones, list) or len(zones) > 10_000:
+        raise ValueError('This snapshot has an invalid DNS manifest.')
+    for item in zones:
+        if not manifest_file(item, offsite_dns.LIMIT):
+            raise ValueError('This snapshot has an invalid DNS manifest entry.')
+        name(item.get('account'))
+        domain(item.get('domain'))
+        dns.integer(item.get('serial'), 1, 2**32 - 1)
+        dns.integer(item.get('records'), 0, dns.LIMIT)
+    return zones
+
+
+def verified_member(settings, state, identifier, entry, member, limit):
+    archive = stage_member(settings, state, identifier, member, limit)
+    if archive.stat().st_size != entry['size'] or offsite_database.file_digest(archive) != entry['sha256']:
+        shutil.rmtree(archive.parent)
+        raise ValueError('The downloaded file failed its manifest size or checksum check.')
+    return archive
 
 
 def restore_database(settings, state, identifier, account, label):
@@ -272,16 +311,31 @@ def restore_database(settings, state, identifier, account, label):
     if len(matches) != 1:
         raise ValueError('That database is unavailable in this snapshot.')
     entry = matches[0]
-    archive = stage_member(settings, state, identifier, offsite_database.archive_path(entry), offsite_database.DB_LIMIT)
-    if archive.stat().st_size != entry['size'] or offsite_database.file_digest(archive) != entry['sha256']:
-        shutil.rmtree(archive.parent)
-        raise ValueError('The dump failed its backup manifest size or checksum check.')
+    archive = verified_member(settings, state, identifier, entry, offsite_database.archive_path(entry),
+                              offsite_database.DB_LIMIT)
     return archive, entry['engine']
+
+
+def restore_dns(settings, state, identifier, account, host):
+    name(account)
+    domain(host)
+    matches = [item for item in snapshot_zones(settings, state, identifier)
+               if item['account'] == account and item['domain'] == host]
+    if len(matches) != 1:
+        raise ValueError('That managed DNS zone is unavailable in this snapshot.')
+    entry = matches[0]
+    archive = verified_member(settings, state, identifier, entry, offsite_dns.zone_path(entry), offsite_dns.LIMIT)
+    try:
+        offsite_dns.verify_export(archive, entry)
+    except (OSError, ValueError, Problem):
+        shutil.rmtree(archive.parent)
+        raise
+    return archive
 
 
 def retention(settings, state, count, apply=False):
     if not 1 <= count <= 100:
-        raise ValueError('Choose 1–100 website snapshots to keep.')
+        raise ValueError('Choose 1–100 snapshots to keep.')
     mode = [] if apply else ['--dry-run']
     run_restic(settings, 'forget', '--host', settings[2], '--tag', TAG, '--path', str(state / 'upload'),
                '--keep-last', str(count), *mode)
@@ -331,6 +385,11 @@ def parse_args(argv=None):
     sql.add_argument('label')
     sql.add_argument('--import-to', metavar='LABEL')
     sql.add_argument('--password-stdin', action='store_true')
+    commands.add_parser('dns-list', help='Show the managed DNS zones in a snapshot.').add_argument('snapshot_id')
+    zone = commands.add_parser('restore-dns', help='Stage managed DNS records for import in Zone Editor.')
+    zone.add_argument('snapshot_id')
+    zone.add_argument('account')
+    zone.add_argument('domain')
     policy = commands.add_parser('retention')
     policy.add_argument('--keep-last', type=int, required=True)
     policy.add_argument('--apply', action='store_true')
@@ -384,8 +443,9 @@ def perform(args, state):
     settings = restic_settings(CONFIG)
     if args.command == 'snapshot':
         selected = offsite_database.plan(state, inventory)
-        website_snapshot(settings, state, inventory, progress=report_snapshot, database_plan=selected)
-        message = 'Encrypted website and database snapshot saved.' if selected else 'Encrypted website snapshot saved.'
+        counts = hosting_snapshot(settings, state, inventory, progress=report_snapshot, database_plan=selected)
+        message = (f'Encrypted snapshot saved with {counts["websites"]} websites, '
+                   f'{counts["databases"]} databases and {counts["zones"]} DNS zones.')
         report_snapshot('succeeded', message)
     elif args.command == 'init':
         run_restic(settings, 'init')
@@ -403,6 +463,11 @@ def perform(args, state):
             print(f'Imported {imported} into Website Backups for {args.import_to}.')
     elif args.command == 'database-list':
         print(json.dumps(snapshot_databases(settings, state, args.snapshot_id), indent=2))
+    elif args.command == 'dns-list':
+        print(json.dumps(snapshot_zones(settings, state, args.snapshot_id), indent=2))
+    elif args.command == 'restore-dns':
+        restored = restore_dns(settings, state, args.snapshot_id, args.account, args.domain)
+        print(f'Restored DNS records to {restored}')
     elif args.command == 'restore-db':
         destination = None
         if args.import_to:

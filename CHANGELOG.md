@@ -66,3 +66,9 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
   backups using their account-owned database logins.
 - Record dump checksums and sizes, list and recover individual database
   dumps, and optionally import into a different empty database.
+
+## 0.1.0-alpha.8
+
+- Include almaPanel-managed DNS zones in encrypted off-site snapshots.
+- List and recover zone records by account and domain, and load the
+  verified export into Zone Editor for review and publishing.

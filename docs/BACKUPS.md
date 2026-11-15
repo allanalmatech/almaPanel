@@ -67,8 +67,8 @@ sudo bash /opt/almapanel/installer/backup.sh --offsite list
 Use `init` only for a new repository. Use `check` for a previously initialized
 repository. Restic stores encrypted snapshots and deduplicates data across them.
 Open **Off-site Backups** from the administrator dashboard to start a snapshot
-and check its latest progress or failure. The snapshot covers website files
-and the managed databases that an administrator has enrolled. Configure the
+and check its latest progress or failure. Snapshots cover website files,
+managed DNS records and databases that an administrator has enrolled. Configure the
 repository, enroll databases, and recover archives from the server CLI.
 To schedule one run daily around 03:15 server time, run
 `sudo bash installer/enable-offsite-backup.sh --daily` after a tested run.
@@ -82,7 +82,7 @@ accounts. Symlinks and special files cause that website snapshot to fail.
 Website snapshots are file-level and can reflect ongoing writes. Each enrolled
 database is captured separately during the same backup run. Applications that
 need a consistent point across files and several databases should pause writes
-while the run completes. Maildir, DNS and control-plane backups remain separate.
+while the run completes. Maildir and control-plane backups remain separate.
 
 ## Enroll managed databases
 
@@ -139,6 +139,23 @@ after an import failure. If that happens, inspect the staged dump and create
 another empty destination before retrial. Check restored rows before
 pointing application traffic at the new database.
 
+## Recover managed DNS records
+
+Every run includes the zones saved by almaPanel's **Zone Editor** for the
+hosting accounts in that run. List the available zones and recover one as JSON.
+
+```bash
+sudo bash /opt/almapanel/installer/backup.sh --offsite dns-list FULL_SNAPSHOT_ID
+sudo bash /opt/almapanel/installer/backup.sh --offsite restore-dns FULL_SNAPSHOT_ID CUSTOMER example.com
+```
+
+The recovery command gives the path to a root-only `records.json` export.
+In the destination panel, enable managed DNS, select the matching domain
+in **Zone Editor**, and choose **Import JSON**. Review the draft and select
+**Validate and publish**. The destination uses its configured nameservers
+and creates the next zone serial. Registrar delegation and external DNS
+provider records are managed separately.
+
 ## Recover one website from off-site storage
 
 Retrieve the full ID from `list`. The `restore` command writes one ZIP under
@@ -162,8 +179,8 @@ sudo bash /opt/almapanel/installer/backup.sh --offsite retention --keep-last 14
 sudo bash /opt/almapanel/installer/backup.sh --offsite retention --keep-last 14 --apply
 ```
 
-The policy applies to this host’s snapshots, including any database dumps
-stored in them. Plan repository-wide pruning and any immutable storage policy
+The policy applies to this host’s website, database and DNS snapshot data.
+Plan repository-wide pruning and any immutable storage policy
 separately. Keep deletion privileges out of routine backup jobs where your
 storage policy permits it.
 

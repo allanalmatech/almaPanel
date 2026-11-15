@@ -96,3 +96,15 @@ on private test ports. It checked wrong-password rejection, table rows
 and binary data, PostgreSQL view recovery, refusal of unsupported MariaDB
 objects, and full repository data verification. The disposable VM is
 required to exercise systemd and the target OS identity and socket paths.
+
+## Alpha.8 managed DNS recovery acceptance
+
+```bash
+sudo env ALMA_DISPOSABLE_VM=YES ALMA_TEST_DNS=YES ALMA_TEST_OFFSITE=YES bash tests/installation/amazon_vm.sh
+```
+
+The VM runner changes a test zone, restores its prior export through the
+administrator API and queries the active BIND service. The VM run is pending.
+Locally, the restic test checks the recovered record set and can pass it to
+`named-checkzone` when `ALMA_TEST_NAMED_CHECKZONE` is set. The browser test
+checks draft import and rejects a backup for a different domain.

@@ -27,7 +27,7 @@ if [[ ! -x /usr/bin/restic && ! -x /usr/local/bin/restic ]]; then
  fi
 fi
 if [[ $SOURCE != /opt/almapanel ]]; then
- install -m 644 "$SOURCE"/installer/{backup_stream,offsite_database,offsite_backup}.py /opt/almapanel/installer/
+ install -m 644 "$SOURCE"/installer/{backup_stream,offsite_database,offsite_dns,offsite_backup}.py /opt/almapanel/installer/
  install -m 644 "$SOURCE/docs/BACKUPS.md" /opt/almapanel/docs/
 fi
 sed -E "s@^(ExecStart|ExecStopPost)=/usr/bin/python3 @\1=$PANEL_PY @" \

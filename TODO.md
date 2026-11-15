@@ -482,7 +482,7 @@ remaining behavior and live acceptance before completion.
   the latest run's progress or failure.
 - [ ] Run the installed EC2 backup, daily timer and restore with real tenants
   and the selected S3 or SFTP provider.
-- [ ] Add Maildir, DNS and account configuration to full backups.
+- [ ] Add Maildir and account configuration to full backups.
 - [ ] Add complete account restore, scheduled failure alerts and migration.
 
 ## Alpha.7 off-site database implementation and acceptance
@@ -494,3 +494,10 @@ remaining behavior and live acceptance before completion.
   a disposable Amazon Linux VM with the real storage provider.
 - [ ] Add backup coverage for MariaDB objects beyond InnoDB tables, and
   coordinate consistency across databases and website files.
+
+## Alpha.8 managed DNS implementation and acceptance
+
+- [x] Archive managed DNS records, recover a verified export and validate it
+  in BIND. Zone Editor verifies the export's domain before loading a draft.
+- [ ] Run the live Amazon Linux backup and republish checks.
+- [ ] Cover external DNS integrations and full-account recovery.

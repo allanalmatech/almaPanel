@@ -1,7 +1,7 @@
 # Feature matrix
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**Alpha.7 evaluation.** Core installation and first-admin setup were verified by
+**Alpha.8 evaluation.** Core installation and first-admin setup were verified by
 the operator on Amazon Linux 2023 during alpha.1. The table distinguishes local
 tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 
@@ -53,7 +53,7 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | DNS templates | Domains | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
 | Nameserver configuration | Domains | Partial | Configure forward-zone NS records at setup | Real BIND zone validation | Ubuntu 24.04 / AL2023 | External nameserver and registrar setup required |
 | DNSSEC | Domains | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| DNS import/export | Domains | Partial | JSON record list | Typed DNS case tests | Ubuntu 24.04 / AL2023 | BIND master-file imports remain open |
+| DNS import/export | Domains | Partial | Typed JSON, domain-bound recovery imports and managed zones in encrypted snapshots | Chromium draft import and BIND zone validation | Ubuntu 24.04 / AL2023 | BIND master-file imports and live EC2 republish remain open |
 | Domain verification | Domains | Implemented locally | DNS TXT proof before tenant claim | Local WSGI authorization tests | Ubuntu 24.04 / AL2023 | Requires dig and public DNS |
 | Document roots | Domains | Implemented locally | Validated paths inside tenant public_html | Real Nginx config validation | Ubuntu 24.04 / AL2023 | Public VM tests pending |
 | Email Accounts | Email | Partial | Dovecot virtual mailboxes with password resets, quotas, archive and restore | Local API, map and config tests | Ubuntu 24.04 / AL2023 target | Live login, quota, delivery and certificate renewal pending |
@@ -151,11 +151,11 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Control-plane backup | Backup and recovery | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Snapshot code; not customer recovery |
 | Control-plane restore | Backup and recovery | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | Same-server exact registry guard; not live tested |
 | Full-account backup | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |
-| Website/database/mail/DNS backup | Backup and recovery | Partial | Encrypted off-site snapshots of website ZIPs and enrolled SQL databases | Real local website and database recovery | Ubuntu 24.04 / AL2023 | Mail, DNS, panel state and full-account recovery remain open |
-| Scheduled backups | Backup and recovery | Partial | Daily or weekly website snapshots; daily off-site websites and enrolled SQL | Local scheduler, retention and backup tests | Ubuntu 24.04 / AL2023 | Mail and DNS scheduling remain open; installed timer needs acceptance |
+| Website/database/mail/DNS backup | Backup and recovery | Partial | Encrypted off-site snapshots of website ZIPs, enrolled databases and managed DNS zones | Local website, database and DNS recovery | Ubuntu 24.04 / AL2023 | Mail, panel state and full-account recovery remain open |
+| Scheduled backups | Backup and recovery | Partial | Daily or weekly website snapshots and daily off-site websites, enrolled SQL and managed DNS | Local scheduler, retention and backup tests | Ubuntu 24.04 / AL2023 | Mail scheduling and installed timer acceptance remain open |
 | Incremental backups | Backup and recovery | Partial | Restic deduplicates website snapshot data across runs | Real restic local snapshot test | Ubuntu 24.04 / AL2023 | Website scope and staging limits |
 | SFTP/S3 remote storage | Backup and recovery | Partial | Administrator-configured restic SFTP and HTTPS S3 repositories | Local protocol fixtures with real restic | Ubuntu 24.04 / AL2023 | External repository and EC2 verification pending |
-| Encrypted backup | Backup and recovery | Partial | Restic repository encryption for website archives and enrolled SQL dumps | Real restic recovery and wrong-password test | Ubuntu 24.04 / AL2023 | Mail, DNS and complete account data remain open |
+| Encrypted backup | Backup and recovery | Partial | Restic repository encryption for websites, enrolled SQL and managed DNS | Real restic recovery and wrong-password test | Ubuntu 24.04 / AL2023 | Mail and complete account data remain open |
 | Retention and integrity policies | Backup and recovery | Partial | Website ZIP integrity check and host-scoped restic retention | Local CRC, retention and full repository data tests | Ubuntu 24.04 / AL2023 | Production retention, snapshot scheduling and remote acceptance pending |
 | Individual-file restore | Backup and recovery | Implemented locally | Browse/search ZIP and recover to an unused path | Local conflict, corruption and Chromium filesystem tests | Ubuntu 24.04 / AL2023 | Full EC2 acceptance pending |
 | Complete-account restore | Backup and recovery | Not implemented | None | Not run | Ubuntu 24.04 target | Outstanding requested scope |

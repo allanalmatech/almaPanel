@@ -189,7 +189,7 @@ async function browseBackup(path, name, panel, stillOpen) {
 async function offsiteBackupsView(epoch) {
     const backup = await api('/offsite-backups');
     if (routeEpoch !== epoch) return;
-    view('Off-site backups', 'Back up website files and enrolled databases to the configured encrypted repository.',
+    view('Off-site backups', 'Back up website files, managed DNS zones and enrolled databases to the encrypted repository.',
         `<section class="panel"><h2>Latest snapshot</h2><p>${esc(backup.message)}</p>
         ${backup.updated_at ? `<p>Updated ${esc(new Date(backup.updated_at * 1000).toLocaleString())}</p>` : ''}
         ${backup.state === 'running' && backup.total > 0 ? `<progress aria-label="Backup items prepared"
@@ -522,12 +522,20 @@ async function dnsView(epoch) {
                 try {
                     const file = event.target.files[0];
                     if (!file || file.size > 100000) throw Error('Choose a JSON file below 100 KB.');
-                    const draft = JSON.parse(await file.text());
+                    const input = JSON.parse(await file.text());
+                    let draft = input;
+                    if (!Array.isArray(input)) {
+                        if (!input || input.format !== 1 || input.domain !== host) {
+                            throw Error('Select the domain named in this DNS backup.');
+                        }
+                        draft = input.records;
+                    }
                     if (!Array.isArray(draft) || draft.length > 100 || draft.some(item => !item || typeof item !== 'object')) {
                         throw Error('Choose a JSON export with up to 100 records.');
                     }
                     records = draft;
                     render();
+                    notice('Records loaded into the draft. Review them before publishing.');
                 } catch (error) { notice(error.message); }
             };
             actionHandler(content, '#zone-drop', async () => {

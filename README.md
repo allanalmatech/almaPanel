@@ -4,7 +4,7 @@
 
 Linux hosting control panel with an original, compact, grouped-tool interface inspired by familiar hosting workflows.
 
-> **0.1.0-alpha.7 — evaluation.** Enrolled MariaDB and PostgreSQL databases can join encrypted off-site website snapshots. An administrator can recover a verified dump into a separate database. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for live acceptance and release gates.
+> **0.1.0-alpha.8 — evaluation.** Off-site snapshots include website files, managed DNS zones and enrolled MariaDB and PostgreSQL databases. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for live acceptance and release gates.
 
 Amazon Linux 2023 is also an evaluation target. See [Amazon Linux 2023 EC2 evaluation](DEPLOYMENT.md#amazon-linux-2023-ec2-evaluation).
 

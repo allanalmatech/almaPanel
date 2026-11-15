@@ -177,3 +177,23 @@ enrollment, staging and restore commands are in [docs/BACKUPS.md](docs/BACKUPS.m
 MariaDB capture covers InnoDB tables. Each database capture has its own
 consistency point. The daily timer and remote recovery on EC2 require live
 acceptance. Mailbox, DNS, panel state and full-account recovery remain open.
+
+## 2026-11-15 · 0.1.0-alpha.8
+
+Managed DNS zones now join the encrypted off-site snapshot. Each record
+export is bound to its source domain, checked against the snapshot hash,
+and loaded as a draft by Zone Editor. An administrator reviews and
+publishes the draft through the existing BIND configuration workflow.
+
+- `make check` passed 71 tests plus Python, JavaScript and shell syntax checks.
+- Restic recovered and verified an exported DNS zone. BIND 9 accepted the
+  file rendered from its recovered records. Website recovery and previous
+  snapshot formats also passed.
+- Chromium loaded the restored DNS draft for the matching domain and rejected
+  a different domain. The MariaDB and PostgreSQL round trips passed again.
+- OpenAPI validation, Bandit at the CI threshold, the basic secret scan and
+  systemd unit verification passed.
+
+The disposable Amazon Linux test can publish the recovered zone and query
+the running BIND service. Live EC2 and remote storage acceptance remain
+open. Mailbox, panel state and full-account recovery remain open.

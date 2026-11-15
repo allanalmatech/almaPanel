@@ -128,6 +128,23 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button',name='Run backup').click()
             page.get_by_text('Off-site backup requested.',exact=True).wait_for()
             page.get_by_role('progressbar',name='Backup items prepared').wait_for()
+            host = 'site.example.com'
+            page.route('**/api/accounts/*/domains', lambda route: route.fulfill(
+                json=[{'name': host, 'state': 'active'}]))
+            page.route('**/api/accounts/*/dns?domain=*', lambda route: route.fulfill(
+                json={'available': True, 'active': True, 'nameservers': ['ns1.example.com'], 'records': []}))
+            page.locator('#nav a[href="#dns"]').click()
+            importer = page.locator('#zone-import')
+            sample = {'format': 1, 'domain': 'another.example.com', 'serial': 1234,
+                      'records': [{'name': '@', 'type': 'A', 'value': '192.0.2.10', 'ttl': 3600}]}
+            importer.set_input_files({'name': 'records.json', 'mimeType': 'application/json',
+                                      'buffer': json.dumps(sample).encode()})
+            page.get_by_text('Select the domain named in this DNS backup.',exact=True).wait_for()
+            sample['domain'] = host
+            importer.set_input_files({'name': 'records.json', 'mimeType': 'application/json',
+                                      'buffer': json.dumps(sample).encode()})
+            page.get_by_role('cell',name='192.0.2.10',exact=True).wait_for()
+            page.get_by_text('Records loaded into the draft.',exact=False).wait_for()
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.locator('#search').fill('file manager')
             page.locator('.tool[href="#files"]').wait_for()
@@ -161,6 +178,6 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('heading',name='Sign in to your account').wait_for()
             assert not errors, errors
             browser.close()
-            print('Browser acceptance passed for setup, login, packages, mail form, ZIP restore, search, profile, API tokens, theme, navigation and logout.')
+            print('Browser acceptance passed for account setup, mail, ZIP restore, off-site status, DNS draft recovery, preferences and navigation.')
     finally:
         server.shutdown();thread.join();os.environ.pop('ALMA_ORIGIN',None)

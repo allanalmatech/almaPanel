@@ -57,3 +57,9 @@ class EnrolledDatabases(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'checksum'):
                 backup.restore_database(None, self.state, '1' * 64, 'hosting', 'db')
         self.assertFalse(target.exists())
+
+    def test_previous_database_snapshot_still_lists_dumps_and_has_no_zones(self):
+        entry = {'account': 'hosting', 'label': 'db', 'engine': 'mariadb', 'size': 3, 'sha256': '1' * 64}
+        with patch.object(backup, 'read_manifest', return_value={'format': 2, 'databases': [entry]}):
+            self.assertEqual(backup.snapshot_databases(None, self.state, '1' * 64), [entry])
+            self.assertEqual(backup.snapshot_zones(None, self.state, '1' * 64), [])

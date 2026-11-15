@@ -13,6 +13,9 @@ fi
 if [[ ${ALMA_TEST_SFTP:-NO} == YES ]]; then
  bash "$ROOT/installer/enable-sftp.sh"
 fi
+if [[ ${ALMA_TEST_DNS:-NO} == YES ]]; then
+ bash "$ROOT/installer/enable-dns.sh" ns1.example.com
+fi
 if [[ ${ALMA_TEST_MAIL:-NO} == YES ]]; then
  mail_fixture=$(mktemp -d)
  trap 'rm -rf -- "$mail_fixture"' EXIT

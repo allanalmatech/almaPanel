@@ -385,7 +385,7 @@ An account outside the caller’s scope returns 404.
 ### Off-site backup status
 
 An administrator session can GET `/offsite-backups` for the latest recorded
-website and database backup progress, outcome and update time. POST requests a background run
+website, database and managed DNS progress, outcome and update time. POST requests a background run
 through the installed backup service. POST requires the panel Origin and CSRF
 token. The response confirms submission of the request. Use GET to read the
 backup outcome.

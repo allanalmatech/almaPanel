@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.7",
+    "version": "0.1.0-alpha.8",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -5282,7 +5282,7 @@
     },
     "/offsite-backups": {
       "get": {
-        "summary": "Read the latest encrypted website and database backup status",
+        "summary": "Read the latest encrypted off-site backup status",
         "security": [
           {
             "session": []
@@ -5322,7 +5322,7 @@
         }
       },
       "post": {
-        "summary": "Request an encrypted backup of websites and enrolled databases",
+        "summary": "Queue a website, enrolled database and managed DNS backup",
         "security": [
           {
             "session": []

@@ -15,7 +15,7 @@ from unittest.mock import patch
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from agent import file_tools
+from agent import dns, file_tools
 from installer import offsite_backup as backup
 
 
@@ -35,7 +35,14 @@ class WebsiteRecovery(unittest.TestCase):
             env = {'RESTIC_REPOSITORY': str(repo), 'RESTIC_PASSWORD_FILE': str(token), 'PATH': '/usr/bin:/bin'}
             settings = ([restic, '--no-cache'], env, 'website-test')
             other = (settings[0], settings[1], 'unrelated-test')
-            inventory = {'hosting': {'state': 'active'}}
+            host = 'acceptance.example.com'
+            records = [
+                {'name': '@', 'type': 'A', 'value': '192.0.2.10', 'ttl': 3600},
+                {'name': 'mail', 'type': 'A', 'value': '192.0.2.12', 'ttl': 600},
+                {'name': '@', 'type': 'MX', 'value': 'mail.acceptance.example.com.', 'priority': 10, 'ttl': 3600},
+            ]
+            inventory = {'hosting': {'state': 'active', 'domains': [host],
+                                     'zones': {host: {'serial': 1234, 'records': records}}}}
             website = web / 'index.html'
             website.write_text('first version')
 
@@ -47,12 +54,27 @@ class WebsiteRecovery(unittest.TestCase):
             web_fd = os.open(web, file_tools.NOFOLLOW_DIR)
             try:
                 backup.run_restic(settings, 'init')
-                backup.website_snapshot(settings, state, inventory, capture)
+                backup.hosting_snapshot(settings, state, inventory, capture)
                 first = backup.snapshots(settings, state)[0]['id']
                 self.assertFalse((state / 'upload').exists())
+                zones = backup.snapshot_zones(settings, state, first)
+                self.assertEqual([(row['account'], row['domain'], row['records']) for row in zones],
+                                 [('hosting', host, 3)])
+                with self.assertRaisesRegex(ValueError, 'unavailable'):
+                    backup.restore_dns(settings, state, first, 'second', host)
+                export = backup.restore_dns(settings, state, first, 'hosting', host)
+                recovered_zone = json.loads(export.read_text())
+                self.assertEqual(recovered_zone, {'format': 1, 'domain': host, 'serial': 1234, 'records': records})
+                checker = os.environ.get('ALMA_TEST_NAMED_CHECKZONE')
+                if checker:
+                    rendered = root / 'recovered.zone'
+                    rendered.write_text(dns.render(host, ['ns1.example.com'],
+                                                   recovered_zone['serial'], recovered_zone['records']))
+                    subprocess.run([checker, host, str(rendered)], check=True)
+                shutil.rmtree(export.parent)
                 website.write_text('second version')
-                backup.website_snapshot(settings, state, inventory, capture)
-                backup.website_snapshot(other, state, inventory, capture)
+                backup.hosting_snapshot(settings, state, inventory, capture)
+                backup.hosting_snapshot(other, state, inventory, capture)
                 unrelated = backup.snapshots(other, state)[0]['id']
                 with self.assertRaisesRegex(ValueError, 'outside this host'):
                     backup.restore(settings, state, unrelated, 'hosting')
@@ -99,6 +121,7 @@ class WebsiteRecovery(unittest.TestCase):
                 backup.run_restic(settings, 'backup', '--host', settings[2], '--tag', backup.TAG, '--', str(old_stage))
                 legacy = max(backup.snapshots(settings, state), key=lambda item: item['time'])['id']
                 self.assertEqual(backup.snapshot_databases(settings, state, legacy), [])
+                self.assertEqual(backup.snapshot_zones(settings, state, legacy), [])
                 with zipfile.ZipFile(backup.restore(settings, state, legacy, 'hosting')) as recovered:
                     self.assertEqual(recovered.read('index.html'), b'second version')
             finally:

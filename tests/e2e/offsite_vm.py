@@ -37,6 +37,9 @@ def accept(call, account_url, database_probes):
     if any(config.iterdir()) or Path('/var/lib/almapanel-offsite/database-logins.json').exists():
         raise SystemExit('Use an empty backup configuration on the disposable VM.')
     enrolled = []
+    zone = 'acceptance.example.com'
+    restore_zone = os.environ.get('ALMA_TEST_DNS') == 'YES'
+    dns_records = [{'name': '@', 'type': 'A', 'value': '192.0.2.10', 'ttl': 3600}]
     old_mask = os.umask(0o077)
     try:
         with tempfile.TemporaryDirectory(prefix='alma-restic-acceptance-', dir='/var/backups') as repository:
@@ -45,6 +48,8 @@ def accept(call, account_url, database_probes):
             for source in database_probes:
                 offsite('database-include', 'vmtenant', source['label'], '--password-stdin', password=source['password'])
                 enrolled.append(source['label'])
+            if restore_zone:
+                call(account_url + '/dns', {'action': 'save', 'domain': zone, 'records': dns_records})
             offsite('init')
             offsite('snapshot')
             offsite('check', '--read-data')
@@ -53,6 +58,21 @@ def accept(call, account_url, database_probes):
             entries = json.loads(offsite('list'))
             assert len(entries) == 1
             snapshot = entries[0]['id']
+            if restore_zone:
+                zones = json.loads(offsite('dns-list', snapshot))
+                assert [(item['account'], item['domain']) for item in zones] == [('vmtenant', zone)]
+                call(account_url + '/dns', {'action': 'save', 'domain': zone,
+                                            'records': [{**dns_records[0], 'value': '192.0.2.20'}]})
+                output = offsite('restore-dns', snapshot, 'vmtenant', zone)
+                export = Path(output.removeprefix('Restored DNS records to ').strip())
+                draft = json.loads(export.read_text())
+                assert draft['domain'] == zone and draft['records'] == dns_records
+                call(account_url + '/dns', {'action': 'save', 'domain': zone, 'records': draft['records']})
+                reply = subprocess.run(['/usr/bin/dig', '-r', '@127.0.0.1', '+time=2', '+tries=2',
+                                        '+short', zone, 'A'], text=True, capture_output=True,
+                                       check=True, timeout=10).stdout.strip()
+                assert reply == '192.0.2.10', reply
+                print('Live BIND accepted the restored managed zone and served its recovered record.')
             sql = json.loads(offsite('database-list', snapshot))
             assert {entry['label'] for entry in sql} == set(enrolled)
             for source in database_probes:
