@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
-"""Root-only, encrypted website snapshot transport and recovery staging."""
+"""Root-only encrypted off-site backup and recovery staging."""
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import pwd
 import re
-import selectors
 import shutil
 import stat
 import subprocess
@@ -18,6 +17,12 @@ import time
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from agent import databases
+from backend.core import Problem, name
+from installer import offsite_database
+from installer.backup_stream import stream
+
 CONFIG = Path('/etc/almapanel/offsite-backup')
 STATE = Path('/var/lib/almapanel-offsite')
 STATUS = Path('/var/lib/almapanel-backup-status')
@@ -31,6 +36,8 @@ SFTP = re.compile(r'sftp://[a-zA-Z0-9_][a-zA-Z0-9_.-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*
                   r'(?::[0-9]{1,5})?/[a-zA-Z0-9_./-]+\Z')
 SNAPSHOT = re.compile(r'[a-f0-9]{64}\Z')
 ARCHIVE_LIMIT = 130 * 1024 * 1024
+MANIFEST = 'almapanel-websites.json'
+MANIFEST_LIMIT = 256 * 1024
 
 
 def protected(path, owner, *, directory=False):
@@ -129,7 +136,7 @@ def capture_site(account, target):
                        umask=0o077, check=True, timeout=120)
 
 
-def website_snapshot(settings, state, inventory, capture=capture_site, progress=None):
+def website_snapshot(settings, state, inventory, capture=capture_site, progress=None, *, database_plan=()):
     stage = state / 'upload'
     if stage.exists() or stage.is_symlink():
         protected(stage, os.geteuid(), directory=True)
@@ -151,10 +158,20 @@ def website_snapshot(settings, state, inventory, capture=capture_site, progress=
                 raise ValueError('Keep at least 256 MiB free for website backup staging.')
             print(f'Preparing the website archive for {account}.', flush=True)
             capture(account, stage / f'{account}.zip')
-        metadata = {'format': 1, 'host': settings[2], 'scope': 'website-files', 'accounts': sites}
-        (stage / 'almapanel-websites.json').write_text(json.dumps(metadata, indent=2) + '\n')
+        database_total = len(database_plan)
+        entries = []
+        for count, (db, password) in enumerate(database_plan):
+            if progress:
+                progress('running', 'Preparing enrolled database dumps.', completed=count, total=database_total)
+            if shutil.disk_usage(state).free < 256 * 1024 * 1024:
+                raise ValueError('Keep at least 256 MiB free for database backup staging.')
+            print(f'Preparing the database dump for {db["account"]}/{db["label"]}.', flush=True)
+            entries.append(offsite_database.dump(db, password, stage / offsite_database.archive_path(db)))
+        metadata = {'format': 2, 'host': settings[2], 'scope': 'websites-and-enrolled-databases',
+                    'accounts': sites, 'databases': entries}
+        (stage / MANIFEST).write_text(json.dumps(metadata, indent=2) + '\n')
         if progress:
-            progress('running', 'Uploading encrypted website archives.', completed=len(sites), total=len(sites))
+            progress('running', 'Uploading the encrypted snapshot.')
         run_restic(settings, 'backup', '--host', settings[2], '--tag', TAG, '--', str(stage))
     finally:
         shutil.rmtree(stage)
@@ -180,7 +197,7 @@ def report_snapshot(status, label, *, completed=0, total=0):
 def record_failure():
     if os.environ.get('SERVICE_RESULT') not in (None, 'success'):
         with locked_state():
-            report_snapshot('failed', 'Website backup failed. Review the backup service journal.')
+            report_snapshot('failed', 'Off-site backup failed. Review the backup service journal.')
 
 
 def snapshots(settings, state):
@@ -189,54 +206,77 @@ def snapshots(settings, state):
     return [item for item in json.loads(output or '[]') if item['paths'] == [str(state / 'upload')]]
 
 
-def recover_archive(command, environment, identifier, data_path, output):
-    deadline = time.monotonic() + 600
-    with subprocess.Popen([*command, 'dump', identifier, data_path], env=environment,
-                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE) as child:
-        try:
-            with selectors.SelectSelector() as ready:
-                ready.register(child.stdout, selectors.EVENT_READ)
-                size = 0
-                while True:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0 or not ready.select(min(30, remaining)):
-                        raise ValueError('The snapshot download timed out.')
-                    data = os.read(child.stdout.fileno(), 512 * 1024)
-                    if not data:
-                        break
-                    size += len(data)
-                    if size > ARCHIVE_LIMIT:
-                        raise ValueError('The restored website ZIP exceeds its size limit.')
-                    output.write(data)
-            if child.wait(timeout=30) or size == 0:
-                raise ValueError('Unable to read this account’s website ZIP from the snapshot.')
-            output.flush()
-            os.fsync(output.fileno())
-        finally:
-            if child.poll() is None:
-                child.kill()
+def download_member(settings, state, identifier, member, output, limit):
+    command, environment, _ = settings
+    data_path = str(state / 'upload' / member)
+    return stream([*command, 'dump', identifier, data_path], output, limit=limit, timeout=600,
+                  failure='Unable to read the requested file from the snapshot.', env=environment)
 
 
-def restore(settings, state, identifier, account):
+def require_snapshot(settings, state, identifier):
     if not SNAPSHOT.fullmatch(identifier):
         raise ValueError('Provide the full snapshot ID. List snapshot IDs with the list command.')
-    if not ACCOUNT_NAME.fullmatch(account):
-        raise ValueError('Provide a valid hosting account name.')
-    if shutil.disk_usage(state).free < 256 * 1024 * 1024:
-        raise ValueError('Keep at least 256 MiB free for website recovery staging.')
     if not any(item['id'] == identifier for item in snapshots(settings, state)):
         raise ValueError('Snapshot is outside this host’s website backup set.')
+
+
+def stage_member(settings, state, identifier, member, limit):
+    if shutil.disk_usage(state).free < 256 * 1024 * 1024:
+        raise ValueError('Keep at least 256 MiB free for off-site recovery staging.')
     target = Path(tempfile.mkdtemp(prefix='restore-', dir=state))
     try:
-        archive = target / f'{account}.zip'
-        command, environment, _ = settings
-        data_path = str(state / 'upload' / archive.name)
+        archive = target / member.name
         with archive.open('xb') as output:
-            recover_archive(command, environment, identifier, data_path, output)
+            download_member(settings, state, identifier, member, output, limit)
     except BaseException:
         shutil.rmtree(target)
         raise
     return archive
+
+
+def restore(settings, state, identifier, account):
+    name(account)
+    require_snapshot(settings, state, identifier)
+    return stage_member(settings, state, identifier, Path(f'{account}.zip'), ARCHIVE_LIMIT)
+
+
+def snapshot_databases(settings, state, identifier):
+    require_snapshot(settings, state, identifier)
+    with tempfile.TemporaryFile() as output:
+        download_member(settings, state, identifier, Path(MANIFEST), output, MANIFEST_LIMIT)
+        output.seek(0)
+        manifest = json.load(output)
+    if not isinstance(manifest, dict) or manifest.get('host') != settings[2] or manifest.get('format') not in (1, 2):
+        raise ValueError('This snapshot has an incompatible backup manifest.')
+    if manifest['format'] == 1:
+        return []
+    entries = manifest.get('databases')
+    if not isinstance(entries, list) or len(entries) > 100 * databases.MAX_DATABASES:
+        raise ValueError('This snapshot has an invalid database manifest.')
+    for item in entries:
+        if (not isinstance(item, dict) or not isinstance(item.get('engine'), str)
+                or item['engine'] not in offsite_database.DB_SUFFIX or type(item.get('size')) is not int
+                or not 1 <= item['size'] <= offsite_database.DB_LIMIT or not isinstance(item.get('sha256'), str)
+                or not SNAPSHOT.fullmatch(item['sha256'])):
+            raise ValueError('This snapshot has an invalid database manifest entry.')
+        name(item.get('account'))
+        databases.label(item.get('label'))
+    return entries
+
+
+def restore_database(settings, state, identifier, account, label):
+    name(account)
+    databases.label(label)
+    matches = [item for item in snapshot_databases(settings, state, identifier)
+               if item.get('account') == account and item.get('label') == label]
+    if len(matches) != 1:
+        raise ValueError('That database is unavailable in this snapshot.')
+    entry = matches[0]
+    archive = stage_member(settings, state, identifier, offsite_database.archive_path(entry), offsite_database.DB_LIMIT)
+    if archive.stat().st_size != entry['size'] or offsite_database.file_digest(archive) != entry['sha256']:
+        shutil.rmtree(archive.parent)
+        raise ValueError('The dump failed its backup manifest size or checksum check.')
+    return archive, entry['engine']
 
 
 def retention(settings, state, count, apply=False):
@@ -278,6 +318,19 @@ def parse_args(argv=None):
     recover.add_argument('snapshot_id')
     recover.add_argument('account')
     recover.add_argument('--import-to', metavar='ACCOUNT')
+    enroll = commands.add_parser('database-include', help='Enroll a managed database in scheduled off-site backups.')
+    exclude = commands.add_parser('database-exclude', help='Stop including a database in new snapshots.')
+    for command in (enroll, exclude):
+        command.add_argument('account')
+        command.add_argument('label')
+    enroll.add_argument('--password-stdin', action='store_true')
+    commands.add_parser('database-list', help='Show databases in a snapshot.').add_argument('snapshot_id')
+    sql = commands.add_parser('restore-db', help='Stage a dump, optionally importing into a separate empty database.')
+    sql.add_argument('snapshot_id')
+    sql.add_argument('account')
+    sql.add_argument('label')
+    sql.add_argument('--import-to', metavar='LABEL')
+    sql.add_argument('--password-stdin', action='store_true')
     policy = commands.add_parser('retention')
     policy.add_argument('--keep-last', type=int, required=True)
     policy.add_argument('--apply', action='store_true')
@@ -305,22 +358,35 @@ def main(args):
         return
     with locked_state() as state:
         if args.command == 'snapshot':
-            report_snapshot('running', 'Starting website backup.')
+            report_snapshot('running', 'Starting off-site backup.')
         try:
             perform(args, state)
-        except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        except (OSError, ValueError, KeyError, Problem, subprocess.SubprocessError):
             if args.command == 'snapshot':
-                report_snapshot('failed', 'Website backup failed. Review the backup service journal.')
+                report_snapshot('failed', 'Off-site backup failed. Review the backup service journal.')
             raise
 
 
 def perform(args, state):
+    if args.command in ('snapshot', 'restore', 'restore-db', 'database-include'):
+        inventory = json.loads(REGISTRY.read_text()) if REGISTRY.is_file() else {}
+    if args.command == 'database-include':
+        database = offsite_database.managed_database(inventory, args.account, args.label)
+        password = offsite_database.login_password('Current database password: ', args.password_stdin)
+        offsite_database.enroll(state, database, password)
+        print(f'{args.account}/{args.label} will be included in new off-site backups.')
+        return
+    if args.command == 'database-exclude':
+        offsite_database.exclude(state, args.account, args.label)
+        print(f'{args.account}/{args.label} was removed from new off-site backups.')
+        return
     protected(CONFIG, 0, directory=True)
     settings = restic_settings(CONFIG)
     if args.command == 'snapshot':
-        inventory = json.loads(REGISTRY.read_text()) if REGISTRY.is_file() else {}
-        website_snapshot(settings, state, inventory, progress=report_snapshot)
-        report_snapshot('succeeded', 'Encrypted website snapshot saved.')
+        selected = offsite_database.plan(state, inventory)
+        website_snapshot(settings, state, inventory, progress=report_snapshot, database_plan=selected)
+        message = 'Encrypted website and database snapshot saved.' if selected else 'Encrypted website snapshot saved.'
+        report_snapshot('succeeded', message)
     elif args.command == 'init':
         run_restic(settings, 'init')
     elif args.command == 'list':
@@ -328,7 +394,6 @@ def perform(args, state):
     elif args.command == 'check':
         run_restic(settings, 'check', *(['--read-data'] if args.read_data else []))
     elif args.command == 'restore':
-        inventory = json.loads(REGISTRY.read_text()) if REGISTRY.is_file() else {}
         if args.import_to and inventory.get(args.import_to, {}).get('state') != 'active':
             raise ValueError('Choose an existing active destination account.')
         archive = restore(settings, state, args.snapshot_id, args.account)
@@ -336,6 +401,22 @@ def perform(args, state):
         if args.import_to:
             imported = import_website(args.import_to, archive, inventory)
             print(f'Imported {imported} into Website Backups for {args.import_to}.')
+    elif args.command == 'database-list':
+        print(json.dumps(snapshot_databases(settings, state, args.snapshot_id), indent=2))
+    elif args.command == 'restore-db':
+        destination = None
+        if args.import_to:
+            if args.import_to == args.label:
+                raise ValueError('Use a different database label for recovery.')
+            destination = offsite_database.managed_database(inventory, args.account, args.import_to, active_only=True)
+        archive, engine = restore_database(settings, state, args.snapshot_id, args.account, args.label)
+        print(f'Restored {engine} dump to {archive}', flush=True)
+        if destination:
+            if destination['engine'] != engine:
+                raise ValueError('Create the destination database with the same SQL engine as the backup.')
+            password = offsite_database.login_password('Destination database password: ', args.password_stdin)
+            offsite_database.import_dump(destination, password, archive)
+            print(f'Imported the dump into {args.account}/{args.import_to}.')
     elif args.command == 'retention':
         retention(settings, state, args.keep_last, args.apply)
 
@@ -343,5 +424,5 @@ def perform(args, state):
 if __name__ == '__main__':
     try:
         main(parse_args())
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
-        sys.exit(f'Off-site website backup failed. {error}')
+    except (OSError, ValueError, KeyError, Problem, subprocess.SubprocessError) as error:
+        sys.exit(f'Off-site backup failed. {error}')

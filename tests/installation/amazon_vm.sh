@@ -23,9 +23,8 @@ if [[ ${ALMA_TEST_MAIL:-NO} == YES ]]; then
   "$mail_fixture/cert.pem" "$mail_fixture/key.pem" --loopback
  export ALMA_TEST_MAIL_CERT="$mail_fixture/cert.pem"
 fi
-/opt/almapanel/venv/bin/python "$ROOT/tests/e2e/live_vm.py"
 if [[ ${ALMA_TEST_OFFSITE:-NO} == YES ]]; then
  bash "$ROOT/installer/enable-offsite-backup.sh"
- /opt/almapanel/venv/bin/python "$ROOT/tests/installation/offsite_vm.py"
 fi
+/opt/almapanel/venv/bin/python "$ROOT/tests/e2e/live_vm.py"
 bash /opt/almapanel/installer/healthcheck.sh

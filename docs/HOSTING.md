@@ -99,7 +99,8 @@ secondary synchronization and DNSSEC remain separate work.
   copies into a new folder. Browse an archive to search it, verify its files or
   restore one file. Daily and weekly schedules retain 1–10 website snapshots.
   See [Website backup and recovery](BACKUPS.md) for limits and setting up an
-  encrypted off-site destination.
+  encrypted off-site destination. Enrolled MariaDB and PostgreSQL databases
+  can be included in the same off-site snapshots.
 - **Cron Jobs** schedules existing PHP scripts inside the account at fixed
   intervals. The worker skips suspended accounts. Jobs have a runtime limit
   and run as the account’s Linux user.

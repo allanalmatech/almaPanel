@@ -1,4 +1,4 @@
-# Website backup and recovery
+# Off-site backup and recovery
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
 ## Restore from the panel
@@ -67,8 +67,9 @@ sudo bash /opt/almapanel/installer/backup.sh --offsite list
 Use `init` only for a new repository. Use `check` for a previously initialized
 repository. Restic stores encrypted snapshots and deduplicates data across them.
 Open **Off-site Backups** from the administrator dashboard to start a snapshot
-and check its latest progress or failure. Repository configuration and restore
-remain administrator CLI operations.
+and check its latest progress or failure. The snapshot covers website files
+and the managed databases that an administrator has enrolled. Configure the
+repository, enroll databases, and recover archives from the server CLI.
 To schedule one run daily around 03:15 server time, run
 `sudo bash installer/enable-offsite-backup.sh --daily` after a tested run.
 Inspect the schedule with `systemctl list-timers almapanel-offsite-backup.timer`
@@ -78,8 +79,65 @@ The job archives active and suspended accounts’ `public_html` trees under thei
 Linux identities. Budget space for temporary root-only ZIPs. The limit is
 128 MiB of unpacked content and 5,000 entries per website, up to 100 hosting
 accounts. Symlinks and special files cause that website snapshot to fail.
-The website snapshot is file-level and can reflect ongoing writes. SQL,
-Maildir, DNS and control-plane state are separate recovery work.
+Website snapshots are file-level and can reflect ongoing writes. Each enrolled
+database is captured separately during the same backup run. Applications that
+need a consistent point across files and several databases should pause writes
+while the run completes. Maildir, DNS and control-plane backups remain separate.
+
+## Enroll managed databases
+
+Use the same account name and database label shown in **Databases**. The
+command prompts for the current database owner password and verifies it
+before adding the database to the next run.
+
+```bash
+sudo bash /opt/almapanel/installer/backup.sh --offsite database-include CUSTOMER DATABASE_LABEL
+sudo bash /opt/almapanel/installer/backup.sh --offsite snapshot
+sudo bash /opt/almapanel/installer/backup.sh --offsite list
+```
+
+Websites continue to be included by default. Enroll each SQL database you
+want backed up. Re-enroll after changing the database password. Run
+`database-exclude CUSTOMER DATABASE_LABEL` before deleting a managed
+database. Historical encrypted dumps remain until their snapshots expire.
+If an enrolled dump fails, the run fails before uploading the snapshot.
+
+The server keeps enrolled credentials in a root-owned mode-0600 file at
+`/var/lib/almapanel-offsite/database-logins.json`. The service runs dump
+clients under the hosting account's Linux UID and supplies only that
+database's login to the client. The encrypted backup manifest records
+database names, dump sizes and checksums.
+
+Capture is limited to 128 MiB per dump. MariaDB capture supports InnoDB
+tables. Views, triggers, routines, events, sequences and other storage
+engines cause the run to fail with a scope error. PostgreSQL uses custom
+logical archives. Object ownership and grants follow the destination's
+managed login. A restore can require compatible extensions and server
+versions.
+
+## Recover a database
+
+List the databases in the selected snapshot. Use `restore-db` by itself
+to download a verified dump into a root-only staging directory.
+
+```bash
+sudo bash /opt/almapanel/installer/backup.sh --offsite database-list FULL_SNAPSHOT_ID
+sudo bash /opt/almapanel/installer/backup.sh --offsite restore-db FULL_SNAPSHOT_ID CUSTOMER DATABASE_LABEL
+```
+
+For an import, first create a separate, empty database in the same hosting
+account with the same SQL engine. Provide its label and enter its password
+when prompted.
+
+```bash
+sudo bash /opt/almapanel/installer/backup.sh --offsite restore-db FULL_SNAPSHOT_ID CUSTOMER DATABASE_LABEL --import-to NEW_LABEL
+```
+
+Keep applications disconnected from the empty destination until the import
+finishes. PostgreSQL imports are transactional. MariaDB DDL can persist
+after an import failure. If that happens, inspect the staged dump and create
+another empty destination before retrial. Check restored rows before
+pointing application traffic at the new database.
 
 ## Recover one website from off-site storage
 
@@ -104,8 +162,8 @@ sudo bash /opt/almapanel/installer/backup.sh --offsite retention --keep-last 14
 sudo bash /opt/almapanel/installer/backup.sh --offsite retention --keep-last 14 --apply
 ```
 
-The policy is scoped to this host’s website snapshot path and does not run
-repository-wide pruning. Plan restic prune and any immutable storage policy
+The policy applies to this host’s snapshots, including any database dumps
+stored in them. Plan repository-wide pruning and any immutable storage policy
 separately. Keep deletion privileges out of routine backup jobs where your
 storage policy permits it.
 

@@ -11,8 +11,31 @@ else:
     import file_tools as files
 
 MARIADB_DUMP = '/usr/bin/mariadb-dump'
+MARIADB = '/usr/bin/mariadb'
 PG_DUMP = '/usr/bin/pg_dump'
 PG_RESTORE = '/usr/bin/pg_restore'
+PSQL = '/usr/bin/psql'
+
+
+def connection_options(engine, name, password):
+    if engine == 'mariadb':
+        return ['--no-defaults', '--protocol=socket', '--user=' + name,
+                '--default-character-set=utf8mb4'], {'MYSQL_PWD': password}
+    if engine == 'postgresql':
+        return ['--host=127.0.0.1', '--no-password', '--username=' + name, '--dbname=' + name], {
+            'PGPASSWORD': password, 'PGCONNECT_TIMEOUT': '8', 'PGSSLMODE': 'prefer',
+        }
+    raise ValueError('Unknown SQL engine.')
+
+
+def transfer_commands(engine, name, options):
+    if engine == 'mariadb':
+        exporter = [MARIADB_DUMP, *options, '--single-transaction', '--quick', '--no-tablespaces', name]
+        importer = [MARIADB, *options, '--batch', '--binary-mode', '--local-infile=0', name]
+        return exporter, importer, '.sql'
+    exporter = [PG_DUMP, *options, '--format=custom', '--no-owner', '--no-acl']
+    importer = [PG_RESTORE, *options, '--no-owner', '--no-acl', '--exit-on-error', '--single-transaction']
+    return exporter, importer, '.pgdump'
 
 
 def execute(argv, env, *, source=None, destination=None):
@@ -32,20 +55,8 @@ def transfer(root, private, request):
     limit = files.MAX_BYTES
     soft, hard = resource.getrlimit(resource.RLIMIT_FSIZE)
     resource.setrlimit(resource.RLIMIT_FSIZE, (min(soft, limit) if soft >= 0 else limit, hard))
-    if engine == 'mariadb':
-        env = {'MYSQL_PWD': password}
-        sql = ['--no-defaults', '--protocol=socket', '--user=' + name, '--default-character-set=utf8mb4']
-        exporter = [MARIADB_DUMP, *sql, '--single-transaction', '--quick', '--no-tablespaces', name]
-        importer = ['/usr/bin/mariadb', *sql, '--batch', '--binary-mode', '--local-infile=0', name]
-        suffix = '.sql'
-    elif engine == 'postgresql':
-        env = {'PGPASSWORD': password, 'PGCONNECT_TIMEOUT': '8', 'PGSSLMODE': 'prefer'}
-        sql = ['--host=127.0.0.1', '--no-password', '--username=' + name, '--dbname=' + name]
-        exporter = [PG_DUMP, *sql, '--format=custom', '--no-owner', '--no-acl']
-        importer = [PG_RESTORE, *sql, '--no-owner', '--no-acl', '--exit-on-error', '--single-transaction']
-        suffix = '.pgdump'
-    else:
-        raise ValueError('Unknown SQL engine.')
+    options, env = connection_options(engine, name, password)
+    exporter, importer, suffix = transfer_commands(engine, name, options)
     if operation == 'sql_export':
         with files.folder(private, ['sql']) as storage:
             import secrets

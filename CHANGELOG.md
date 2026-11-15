@@ -59,3 +59,10 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Configure encrypted off-site website snapshots with restic, run backups
   on demand or daily, track progress and failure in the administrator
   dashboard, preview retention, and recover and import one site ZIP.
+
+## 0.1.0-alpha.7
+
+- Enroll managed MariaDB and PostgreSQL databases for encrypted off-site
+  backups using their account-owned database logins.
+- Record dump checksums and sizes, list and recover individual database
+  dumps, and optionally import into a different empty database.

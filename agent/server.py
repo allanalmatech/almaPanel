@@ -434,7 +434,7 @@ def dispatch(operation,args):
         if not Path('/etc/almapanel/offsite-backup/repository.json').is_file():
             raise ValueError('Configure the off-site repository first.')
         run(['/usr/bin/systemctl', '--no-block', 'start', 'almapanel-offsite-backup.service'], timeout=10)
-        return {'message': 'Website backup requested. Refresh status to track the run.'}
+        return {'message': 'Off-site backup requested. Refresh status to track the run.'}
     if operation=='system.stats':
         import shutil
         mem={k:int(v.split()[0])*1024 for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())}

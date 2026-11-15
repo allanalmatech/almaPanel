@@ -89,9 +89,11 @@ except urllib.error.HTTPError as e:
 else:
     raise AssertionError('A different tenant browsed another account’s backup.')
 csrf = call('/login', {'username':'vmadmin','password':password})['csrf']
+database_probes = []
 for engine in call(account_url + '/databases')['engines']:
     fields = {'action':'create','engine':engine,'label':'probe'+engine}
     first_db = call(account_url + '/databases', fields)
+    database_probes.append(first_db)
     second_db = call(f'/accounts/{second}/databases', fields)
     assert first_db['database'] != second_db['database']
     if engine == 'mariadb':
@@ -148,3 +150,8 @@ if os.environ.get('ALMA_TEST_SFTP') == 'YES':
 if os.environ.get('ALMA_TEST_MAIL') == 'YES':
     from mail_vm import accept
     accept(call, account_url, os.environ['ALMA_TEST_MAIL_CERT'])
+
+
+if os.environ.get('ALMA_TEST_OFFSITE') == 'YES':
+    from offsite_vm import accept
+    accept(call, account_url, database_probes)

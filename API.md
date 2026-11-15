@@ -382,10 +382,10 @@ Use the revision from `backup_contents` when paging and restoring. The agent
 reports stale or damaged archives and destination conflicts as 502 responses.
 An account outside the caller’s scope returns 404.
 
-### Off-site website backup status
+### Off-site backup status
 
 An administrator session can GET `/offsite-backups` for the latest recorded
-backup progress, outcome and update time. POST requests a background run
+website and database backup progress, outcome and update time. POST requests a background run
 through the installed backup service. POST requires the panel Origin and CSRF
 token. The response confirms submission of the request. Use GET to read the
 backup outcome.

@@ -189,12 +189,12 @@ async function browseBackup(path, name, panel, stillOpen) {
 async function offsiteBackupsView(epoch) {
     const backup = await api('/offsite-backups');
     if (routeEpoch !== epoch) return;
-    view('Off-site backups', 'Run an encrypted website backup and review its latest status.',
-        `<section class="panel"><h2>Latest website backup</h2><p>${esc(backup.message)}</p>
+    view('Off-site backups', 'Back up website files and enrolled databases to the configured encrypted repository.',
+        `<section class="panel"><h2>Latest snapshot</h2><p>${esc(backup.message)}</p>
         ${backup.updated_at ? `<p>Updated ${esc(new Date(backup.updated_at * 1000).toLocaleString())}</p>` : ''}
-        ${backup.state === 'running' && backup.total > 0 ? `<progress aria-label="Website archives prepared"
+        ${backup.state === 'running' && backup.total > 0 ? `<progress aria-label="Backup items prepared"
             value="${esc(backup.completed)}" max="${esc(backup.total)}"></progress>` : ''}
-        <button id="offsite-run" ${backup.state === 'running' ? 'disabled' : ''}>Run website backup</button>
+        <button id="offsite-run" ${backup.state === 'running' ? 'disabled' : ''}>Run backup</button>
         <button id="offsite-refresh" class="subtle">Refresh status</button></section>`);
     actionHandler($('#main'), '#offsite-run', async () => {
         notice((await api('/offsite-backups', {})).message);

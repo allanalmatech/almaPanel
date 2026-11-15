@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Alma Tech Labs Inc. SPDX-License-Identifier: LicenseRef-AlmaTech-Pending
 """Exercise encrypted backup, selective retrieval and import with real restic."""
 import io
+import json
 import os
 from pathlib import Path
 import secrets
@@ -89,6 +90,17 @@ class WebsiteRecovery(unittest.TestCase):
                 (root / 'wrong-password').write_text(secrets.token_urlsafe(32))
                 with self.assertRaises(subprocess.CalledProcessError):
                     backup.snapshots((settings[0], invalid, settings[2]), state)
+                old_stage = state / 'upload'
+                old_stage.mkdir()
+                capture('hosting', old_stage / 'hosting.zip')
+                (old_stage / backup.MANIFEST).write_text(json.dumps({
+                    'format': 1, 'host': settings[2], 'scope': 'website-files', 'accounts': ['hosting'],
+                }))
+                backup.run_restic(settings, 'backup', '--host', settings[2], '--tag', backup.TAG, '--', str(old_stage))
+                legacy = max(backup.snapshots(settings, state), key=lambda item: item['time'])['id']
+                self.assertEqual(backup.snapshot_databases(settings, state, legacy), [])
+                with zipfile.ZipFile(backup.restore(settings, state, legacy, 'hosting')) as recovered:
+                    self.assertEqual(recovered.read('index.html'), b'second version')
             finally:
                 os.close(web_fd)
 

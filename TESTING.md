@@ -79,3 +79,20 @@ Run the second command on a clean Amazon Linux VM with restic available
 from your configured repository or installed at `/usr/local/bin/restic`.
 It adds a round trip with the broker's Linux account identities and the
 installed admin CLI. Test your remote destination and timer separately.
+
+## Alpha.7 database backup acceptance
+
+```bash
+sudo env ALMA_DISPOSABLE_VM=YES ALMA_TEST_SQL=YES ALMA_TEST_OFFSITE=YES bash tests/installation/amazon_vm.sh
+```
+
+The VM runner enrolls both database engines through the installed CLI,
+checks the encrypted snapshot, and verifies restored data in a separate
+managed database. It checks the original data and rejects a repeated import
+into the populated destination. The live Amazon Linux run is pending.
+
+The local round trip used MariaDB 11.8, PostgreSQL 17 and real restic 0.18
+on private test ports. It checked wrong-password rejection, table rows
+and binary data, PostgreSQL view recovery, refusal of unsupported MariaDB
+objects, and full repository data verification. The disposable VM is
+required to exercise systemd and the target OS identity and socket paths.

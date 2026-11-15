@@ -482,5 +482,15 @@ remaining behavior and live acceptance before completion.
   the latest run's progress or failure.
 - [ ] Run the installed EC2 backup, daily timer and restore with real tenants
   and the selected S3 or SFTP provider.
-- [ ] Add database, Maildir, DNS and account configuration to full backups.
+- [ ] Add Maildir, DNS and account configuration to full backups.
 - [ ] Add complete account restore, scheduled failure alerts and migration.
+
+## Alpha.7 off-site database implementation and acceptance
+
+- [x] Enroll managed MariaDB and PostgreSQL databases in encrypted off-site
+  snapshots. Verify restored data, checksum failures and occupied destinations.
+- [x] Keep existing website-only backup manifests and recoveries compatible.
+- [ ] Verify database enrollment, scheduled backup and SQL restoration on
+  a disposable Amazon Linux VM with the real storage provider.
+- [ ] Add backup coverage for MariaDB objects beyond InnoDB tables, and
+  coordinate consistency across databases and website files.

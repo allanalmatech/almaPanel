@@ -153,3 +153,27 @@ The optional disposable Amazon Linux runner exercises the installed CLI and
 tenant-owned backup import. Live startup, scheduled jobs and remote-provider
 recovery on EC2 remain pending. Off-site snapshots cover website files. SQL,
 mail, DNS and full-account disaster recovery remain open.
+
+## 2026-11-15 · 0.1.0-alpha.7
+
+Off-site snapshots include selected managed MariaDB and PostgreSQL databases.
+The administrator enrolls each database using its verified owner login.
+Database clients run under the hosting UID. Recovery validates the checksum
+and can import into a separate empty database in the same account. Database
+enrollment, staging and restore commands are in [docs/BACKUPS.md](docs/BACKUPS.md).
+
+- `make check` passed 70 tests plus Python, JavaScript and installer syntax checks.
+- Chromium passed the panel workflows, including off-site backup status.
+- The local test ran real MariaDB 11.8 and PostgreSQL 17 on loopback and used
+  restic 0.18 to archive and recover both databases. Both engines recovered
+  rows and binary values. PostgreSQL also recovered a view. Incorrect
+  credentials and occupied destinations were rejected, and the repository
+  passed a full data check.
+- The restic integration tests passed website recovery, retention, a legacy
+  alpha.6 website snapshot and invalid-archive handling.
+- OpenAPI validation, the basic secret scan, Bandit at the CI threshold,
+  and systemd unit verification passed.
+
+MariaDB capture covers InnoDB tables. Each database capture has its own
+consistency point. The daily timer and remote recovery on EC2 require live
+acceptance. Mailbox, DNS, panel state and full-account recovery remain open.

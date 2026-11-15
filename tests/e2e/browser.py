@@ -118,16 +118,16 @@ with tempfile.TemporaryDirectory() as temp:
                 if route.request.method == 'POST':
                     offsite_status.update(state='running', message='Uploading encrypted website archives.',
                                           completed=1, total=1, updated_at=100)
-                    route.fulfill(json={'message': 'Website backup requested.'})
+                    route.fulfill(json={'message': 'Off-site backup requested.'})
                 else:
                     route.fulfill(json=offsite_status)
 
             page.route('**/api/offsite-backups', browser_offsite)
             page.locator('#nav a[href="#offsite-backups"]').click()
             page.get_by_role('heading',name='Off-site backups',exact=True).wait_for()
-            page.get_by_role('button',name='Run website backup').click()
-            page.get_by_text('Website backup requested.',exact=True).wait_for()
-            page.get_by_role('progressbar',name='Website archives prepared').wait_for()
+            page.get_by_role('button',name='Run backup').click()
+            page.get_by_text('Off-site backup requested.',exact=True).wait_for()
+            page.get_by_role('progressbar',name='Backup items prepared').wait_for()
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.locator('#search').fill('file manager')
             page.locator('.tool[href="#files"]').wait_for()

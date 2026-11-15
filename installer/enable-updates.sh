@@ -37,7 +37,7 @@ with (updater.STATE / "lock").open("w") as lock:
         raise SystemExit(f"almaPanel update stopped. {error}") from None
 PY
 if [[ $SOURCE != /opt/almapanel ]]; then
- for helper in updater.py update.sh healthcheck.sh backup.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh enable-mail.sh renew-site-tls.sh enable-offsite-backup.sh offsite_backup.py; do
+ for helper in updater.py update.sh healthcheck.sh backup.sh enable-databases.sh enable-dns.sh enable-domain-verification.sh enable-site-tls.sh enable-sftp.sh enable-mail.sh renew-site-tls.sh enable-offsite-backup.sh backup_stream.py offsite_database.py offsite_backup.py; do
   install -m 644 "$SOURCE/installer/$helper" "/opt/almapanel/installer/$helper"
  done
  install -m 644 "$SOURCE"/services/systemd/almapanel-site-tls.{timer,service} /opt/almapanel/services/systemd/

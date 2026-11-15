@@ -178,7 +178,7 @@ def api(env, body, db, headers):
         admin(user)
         if method == 'POST':
             result = c.rpc('backup.offsite.trigger')
-            c.audit(db, user['id'], 'backup.offsite.trigger', 'website backups', ip)
+            c.audit(db, user['id'], 'backup.offsite.trigger', 'off-site backups', ip)
             return result
         try:
             return json.loads(Path('/var/lib/almapanel-backup-status/status.json').read_text())
