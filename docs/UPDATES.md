@@ -54,6 +54,14 @@ back to alpha.2, restrict access to the panel. Alpha.2 does not enforce TOTP or
 domain proof, and old site edits cannot preserve all alpha.3 settings.
 Code rollback preserves the database and hosted files.
 
+## Account provisioning fix for alpha.9
+
+Run the reviewed checkout's `installer/enable-updates.sh` on the server to
+apply the unit fix and upgrade the code. The script installs the
+`20-almapanel-provisioning.conf` agent drop-in. The root agent requires a
+writable `/etc` for Linux user and group provisioning. The system tool
+reports `account_files_writable` after the update.
+
 ## Resume after a failed health check
 
 On the EC2 instance, use the updated Git checkout to recover an upgrade

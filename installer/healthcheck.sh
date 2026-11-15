@@ -63,7 +63,10 @@ if ! wait_for_health 'Privileged agent' timeout 6s runuser -u almapanel -- "$PAN
 import sys
 sys.path.insert(0, "/opt/almapanel")
 from backend.core import rpc
-print(rpc("system.stats"))
+stats = rpc("system.stats")
+if stats.get("account_files_writable") is False:
+    raise SystemExit("The agent sees /etc as read-only. Apply the provisioning service update.")
+print(stats)
 '; then
  echo 'Inspect: sudo journalctl -u almapanel-agent -n 40 --no-pager' >&2
  exit 1

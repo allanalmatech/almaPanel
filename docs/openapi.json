@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.8",
+    "version": "0.1.0-alpha.9",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -1410,7 +1410,7 @@
     "/accounts": {
       "get": {
         "summary": "List authorized hosting accounts",
-        "description": "Permissions: Authenticated, scoped",
+        "description": "Permissions: Authenticated, scoped Rows include can_retry (0 or 1) for failed or interrupted Linux provisioning.",
         "security": [
           {
             "session": []
@@ -2346,6 +2346,166 @@
               "example": {
                 "state": "suspended"
               }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/retry-create": {
+      "post": {
+        "summary": "Retry failed or interrupted Linux account creation",
+        "description": "Administrator or owning reseller. Requires session and CSRF. Reuses the existing account and queues a new job.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation response (queued is not completion)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "job_id": 3,
+                  "state": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Account setup is not retryable or an operation is already queued.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See API.md error contract",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Explanation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "example": {}
             }
           }
         }
@@ -5054,7 +5214,7 @@
     },
     "/notifications": {
       "get": {
-        "summary": "List completed and failed operations in the caller\u2019s scope",
+        "summary": "List completed and failed operations in the caller’s scope",
         "security": [
           {
             "session": []
@@ -5162,7 +5322,7 @@
     },
     "/accounts/{id}/mail": {
       "get": {
-        "summary": "Read an account\u2019s mail service, domains, mailboxes, and forwarding settings",
+        "summary": "Read an account’s mail service, domains, mailboxes, and forwarding settings",
         "security": [
           {
             "session": []
@@ -5189,7 +5349,7 @@
         }
       },
       "post": {
-        "summary": "Update an account\u2019s mailbox, local mail routing, or forwarders",
+        "summary": "Update an account’s mailbox, local mail routing, or forwarders",
         "security": [
           {
             "session": []

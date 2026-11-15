@@ -197,3 +197,19 @@ publishes the draft through the existing BIND configuration workflow.
 The disposable Amazon Linux test can publish the recovered zone and query
 the running BIND service. Live EC2 and remote storage acceptance remain
 open. Mailbox, panel state and full-account recovery remain open.
+
+## 2026-11-15 · 0.1.0-alpha.9
+
+The EC2 agent journal recorded a failed `useradd` and a follow-on exception
+that hid the error. A live mount check confirmed that the agent saw `/etc` as
+read-only and that the attempt left no Linux user, group or home. The agent saw
+the mount as writable after the provisioning drop-in was applied.
+
+Updated the agent, systemd unit and checkout upgrade path for local account
+creation. The hosting-account list now exposes a scoped retry action for the
+existing row, and the agent refuses to adopt partial Linux resources. Also set
+the owner/group access on new account homes independently of the service umask.
+
+`make check` passed 75 tests. Chromium exercised the retry UI against the real
+WSGI API and showed the queued job for the same account. Live confirmation of
+the user's retried account and Linux PHP-FPM pool is pending.

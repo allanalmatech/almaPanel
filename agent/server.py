@@ -99,34 +99,56 @@ def configs(changes,service,validator):
         except Exception: logging.exception('Configuration rollback reload failed')
         raise
 
-def account_create(account):
+def account_create(account, *, retry=False):
     name(account)
     data=registry()
-    if account in data:
-        if data[account]['state']=='active': return {'message':'Account already provisioned.'}
-        raise ValueError('Account requires administrator recovery; inspect root registry.')
+    previous = data.get(account)
+    if previous:
+        if previous['state'] == 'active':
+            return {'message': 'Account already provisioned.'}
+        if (not retry or previous['state'] not in ('failed', 'provisioning') or previous.get('domains')
+                or set(previous) - {'state', 'domains'}):
+            raise ValueError('Account requires administrator recovery; inspect the agent registry.')
     username='ap_'+account
     try: pwd.getpwnam(username)
     except KeyError: pass
-    else: raise ValueError('Linux identity already exists; refusing adoption.')
+    else: raise ValueError('Linux user already exists. Reconcile the account on the server before retrying.')
+    try: grp.getgrnam(username)
+    except KeyError: pass
+    else: raise ValueError('Linux group already exists. Reconcile the account on the server before retrying.')
     home=BASE/account
-    if home.exists() or home.is_symlink(): raise ValueError('Home already exists; refusing adoption.')
+    pool = PHP_POOL / f'alma-{account}.conf'
+    if any(os.path.lexists(path) for path in (home, pool, Path(PHP_RUN) / f'alma-{account}.sock')):
+        raise ValueError('Account home or PHP pool already exists. Reconcile it on the server before retrying.')
+    if not account_files_writable():
+        raise ValueError('The agent sees /etc as read-only. Apply the provisioning service update before retrying.')
     data[account]={'state':'provisioning','domains':[]};save(data)
     # Failures deliberately retain customer state; recovery is explicit, never recursive userdel.
     try:
-        run(['/usr/sbin/useradd','--user-group','--no-create-home','--home-dir',str(home),'--shell','/usr/sbin/nologin',username])
+        try:
+            run(['/usr/sbin/useradd','--user-group','--no-create-home','--home-dir',str(home),'--shell','/usr/sbin/nologin',username])
+        except subprocess.CalledProcessError as error:
+            logging.error('useradd for %s exited %s: %r', username, error.returncode, (error.stderr or '')[:500])
+            raise ValueError(f'Linux useradd exited with status {error.returncode}. Review the almapanel-agent journal.') from None
         p=pwd.getpwnam(username)
-        home.mkdir(mode=0o750);os.chown(home,0,p.pw_gid)
+        home.mkdir(mode=0o750)
+        os.chown(home, 0, p.pw_gid)
+        # Systemd's umask enters this block with the home private to root.
+        home.chmod(0o750)
         for child in ('public_html','runtime'):
             path=home/child;path.mkdir(mode=0o750);os.chown(path,p.pw_uid,p.pw_gid)
         # Grant only the web-server read/traverse ACL; other tenants have no access.
         run(['/usr/bin/setfacl','-m',f'u:{WEB_USER}:--x',str(home)])
         run(['/usr/bin/setfacl','-m',f'u:{WEB_USER}:r-x,d:u:{WEB_USER}:r-x',str(home/'public_html')])
-        configs({PHP_POOL / f'alma-{account}.conf':php_pool(account)},PHP_UNIT,[PHP_BIN,'-t'])
+        configs({pool:php_pool(account)},PHP_UNIT,[PHP_BIN,'-t'])
         data[account]['state']='active';save(data)
         return {'message':'Linux account and PHP-FPM pool provisioned.'}
     except Exception:
         data[account]['state']='failed';save(data);raise
+
+
+def account_files_writable():
+    return not os.statvfs('/etc').f_flag & os.ST_RDONLY
 
 def ensure_account_private(home, tenant):
     private = home / 'panel-files'
@@ -444,14 +466,15 @@ def dispatch(operation,args):
             try: states[service]=run(['/usr/bin/systemctl','is-active',service]).strip()
             except subprocess.CalledProcessError: states[service]='inactive or failed'
         return {'load_average':os.getloadavg(),'memory_total':mem['MemTotal'],'memory_available':mem['MemAvailable'],
-                'disk_total':disk.total,'disk_used':disk.used,'services':states,'hostname':socket.gethostname()}
+                'disk_total':disk.total,'disk_used':disk.used,'services':states,'hostname':socket.gethostname(),
+                'account_files_writable':account_files_writable()}
     if operation=='service.restart':
         if args.get('service') not in SERVICES: raise ValueError('Service not allowed.')
         service=args['service']
         run(['/usr/sbin/nginx','-t'] if service=='nginx' else [PHP_BIN,'-t'])
         run(['/usr/bin/systemctl','restart',service]);return {'message':'Service restarted.'}
     account=name(args.get('name'))
-    if operation=='account.create': return account_create(account)
+    if operation=='account.create': return account_create(account, retry=args.get('retry') is True)
     data=registry()
     if account not in data or data[account]['state'] not in ('active','suspended'):
         raise ValueError('Account not provisioned.')
@@ -583,7 +606,7 @@ class Handler(socketserver.StreamRequestHandler):
             logging.info('operation=%s success',obj['operation'])
         except (ValueError,TypeError,KeyError,Problem) as e:
             reply={'ok':False,'error':str(e)}
-        except Exception:
+        except Exception as e:
             # Client subprocess failures can include SQL or tenant input.
             logging.error('Agent operation failed (%s)', type(e).__name__)
             reply={'ok':False,'error':'System operation failed. Review almapanel-agent journal and registry.'}

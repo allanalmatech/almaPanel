@@ -72,3 +72,10 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Include almaPanel-managed DNS zones in encrypted off-site snapshots.
 - List and recover zone records by account and domain, and load the
   verified export into Zone Editor for review and publishing.
+
+## 0.1.0-alpha.9
+
+- Allow the root agent to provision Linux accounts on Amazon Linux 2023.
+- Set account-directory permissions explicitly under the agent's restrictive umask.
+- Return structured agent errors and log Linux account-creation failures.
+- Add an authorized retry for a failed or interrupted hosting-account setup.

@@ -13,7 +13,8 @@ The software has unit-tested errors below; VM remedies are operational guidance,
 | POST returns Origin rejected | Access URL and ALMA_ORIGIN differ; align exact scheme, hostname and port in `/etc/almapanel/panel.env`, restart API. |
 | Login returns 429 | Wait 15 minutes for persisted throttling window; nginx has additional rate limiting. Do not disable protection on a public host. |
 | Account queued forever | Check worker service and its journal. |
-| Failed/interrupted account | Inspect root registry and actual Linux user/pool/home. No automatic unsafe rollback or blind retry. Reconcile on disposable VM before any manual repair. |
+| Failed/interrupted account | Correct the cause in the agent journal and use **Hosting Accounts → Retry setup**. A leftover Linux user, group, home or PHP pool needs server-side reconciliation. |
+| Account creation fails and the agent sees read-only `/etc` | Upgrade from the reviewed Git checkout with `installer/enable-updates.sh`. The agent health check reports whether its account database mount is writable. |
 | Agent unavailable | Check agent service, socket ownership (root:almapanel 0660), process UID and journal. Never chmod the socket 0666. |
 | File rejected | Path traversal, symlink, hardlink, special file or >1 MiB may be involved. Use ordinary account-owned files within public_html. |
 | Nginx 403 for static files | Check account ACLs and directory traversal as www-data; do not make all homes world-readable. |

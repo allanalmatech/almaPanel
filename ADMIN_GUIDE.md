@@ -18,6 +18,12 @@ Complete DEPLOYMENT.md first, using a disposable EC2 VM. Claim the initial admin
 10. Configure the site backup repository and verify recovery using
     [Website backup and recovery](docs/BACKUPS.md).
 
+When an account setup fails, check **Operation History** and the
+`almapanel-agent` journal. After correcting the cause, choose **Hosting Accounts
+→ Retry setup** to use the same username and password. The job checks for
+leftover Linux users, groups, homes and PHP pools. Reconcile those resources
+on the server if they are present.
+
 The [feature matrix](FEATURE_MATRIX.md) and [release checklist](RELEASE_CHECKLIST.md)
 track account termination, network management, administrator permissions,
 resource enforcement and the remaining deployment tests.

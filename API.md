@@ -254,6 +254,15 @@ Response shape/example (illustrative, not live measurements):
 }
 ```
 
+## POST `/accounts/{id}/retry-create`
+
+An administrator or the owning reseller can queue a new provisioning job for
+a failed or interrupted account. Send `{}` with the session and CSRF token.
+The response is `{"job_id":4,"state":"queued"}`. GET `/accounts` includes
+`can_retry` with `1` for rows with a retryable setup state and `0` otherwise.
+The API returns 409 when the account cannot be retried or has an unfinished job.
+The agent checks for conflicting Linux account resources before it provisions.
+
 ## GET `/accounts/{id}/domains`
 List domains. Permissions: **Authorized active account**.
 

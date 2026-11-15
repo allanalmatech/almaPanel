@@ -4,14 +4,18 @@ import io
 import json
 import os
 from pathlib import Path
+import socket
 import sqlite3
+import subprocess
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from backend import core as c
 from backend.app import application
 from agent.files import operate
+from agent import server as agent
 from agent.server import vhost,php_pool,configs
 from worker.main import tick
 
@@ -107,6 +111,27 @@ class API(unittest.TestCase):
         with patch('backend.core.rpc',return_value={'message':'test adapter'}):self.assertTrue(tick())
         self.assertEqual(self.request('/api/accounts')['body'][0]['state'],'active')
         self.assertFalse(tick())
+    def test_retry_failed_account_preserves_identity_and_queues_once(self):
+        self.setup_admin()
+        package = self.package()
+        self.request('/api/accounts', {'username': 'alice', 'password': 'correct horse battery', 'package_id': package})
+        with patch('backend.core.rpc', side_effect=c.Problem('Agent unavailable')):
+            self.assertTrue(tick())
+        failed = self.request('/api/accounts')['body'][0]
+        path = f"/api/accounts/{failed['id']}/retry-create"
+        self.assertTrue(failed['can_retry'])
+        self.assertEqual(self.request(path, {}, csrf='wrong')['status'], 403)
+        self.assertEqual(self.request(path, {})['body']['state'], 'queued')
+        self.assertEqual(self.request(path, {})['status'], 409)
+        with patch('backend.core.rpc', return_value={'message': 'test adapter'}) as rpc:
+            self.assertTrue(tick())
+            rpc.assert_called_once_with('account.create', name='alice', retry=True)
+        active = self.request('/api/accounts')['body'][0]
+        self.assertEqual((active['state'], active['id'], active['user_id'], active['can_retry']),
+                         ('active', failed['id'], failed['user_id'], 0))
+        self.assertEqual(self.request(path, {})['status'], 409)
+        self.login('alice')
+        self.assertEqual(self.request(path, {})['status'], 403)
     def test_domain_count_enforced(self):
         self.setup_admin();p=self.package();a=self.seed_account('alice',1,p)
         for host in ['one.example.com','two.example.com']:
@@ -195,6 +220,53 @@ class Files(unittest.TestCase):
     def test_nonempty_folder_not_recursively_deleted(self):
         self.op('mkdir','folder');self.write('folder/a')
         with self.assertRaises(OSError):self.op('delete','folder')
+
+class Provisioning(unittest.TestCase):
+    def test_broker_sends_structured_failure_after_dispatch_error(self):
+        client, broker = socket.socketpair()
+        with client, broker, patch('agent.server.pwd.getpwnam', return_value=SimpleNamespace(pw_uid=os.getuid())), \
+                patch('agent.server.dispatch', side_effect=subprocess.CalledProcessError(1, '/usr/sbin/useradd')), \
+                self.assertLogs(level='ERROR'):
+            client.sendall(b'{"operation":"account.create","args":{"name":"sample"}}\n')
+            agent.Handler(broker, '', None)
+            with client.makefile('rb') as reader:
+                reply = json.loads(reader.readline())
+        self.assertFalse(reply['ok'])
+        self.assertIn('System operation failed', reply['error'])
+
+    def test_retry_refuses_partial_linux_setup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            (base / 'sample').mkdir()
+            state = {'sample': {'state': 'failed', 'domains': []}}
+            with patch.multiple(agent, BASE=base, PHP_POOL=base, PHP_RUN=temp), \
+                    patch('agent.server.registry', return_value=state), \
+                    patch('agent.server.pwd.getpwnam', side_effect=KeyError), \
+                    patch('agent.server.grp.getgrnam', side_effect=KeyError), patch('agent.server.run') as run:
+                with self.assertRaisesRegex(ValueError, 'home or PHP pool already exists'):
+                    agent.account_create('sample', retry=True)
+                run.assert_not_called()
+
+    def test_retry_clean_account_sets_home_mode_under_service_umask(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            state = {'sample': {'state': 'failed', 'domains': []}}
+            user = SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid())
+            with patch.multiple(agent, BASE=base, PHP_POOL=base, PHP_RUN=temp), \
+                    patch('agent.server.registry', return_value=state), patch('agent.server.save'), \
+                    patch('agent.server.pwd.getpwnam', side_effect=[KeyError, user]), \
+                    patch('agent.server.grp.getgrnam', side_effect=KeyError), patch('agent.server.os.chown'), \
+                    patch('agent.server.run'), patch('agent.server.configs'), \
+                    patch('agent.server.account_files_writable', return_value=True):
+                previous_umask = os.umask(0o077)
+                try:
+                    agent.account_create('sample', retry=True)
+                finally:
+                    os.umask(previous_umask)
+            self.assertEqual((base / 'sample').stat().st_mode & 0o777, 0o750)
+            self.assertTrue((base / 'sample' / 'public_html').is_dir())
+            self.assertEqual(state['sample']['state'], 'active')
+
 
 class Validation(unittest.TestCase):
     def test_account_name_injection(self):

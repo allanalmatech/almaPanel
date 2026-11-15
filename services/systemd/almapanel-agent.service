@@ -17,7 +17,8 @@ RestartSec=5
 TimeoutStopSec=150
 PrivateTmp=true
 ProtectHome=true
-ProtectSystem=full
+# The broker provisions local users and manages service configuration in /etc.
+ProtectSystem=yes
 ReadWritePaths=/etc /srv/almapanel /var/lib/almapanel-agent /run/almapanel /var/log
 NoNewPrivileges=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

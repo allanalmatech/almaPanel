@@ -147,7 +147,16 @@ def api(env, body, db, headers):
         return {'message':'Reseller created.'}
     if path == '/api/accounts':
         if method == 'GET':
-            return rows(db.execute("SELECT a.*,p.name AS package FROM accounts a JOIN packages p ON a.package_id=p.id WHERE ?='admin' OR a.user_id=? OR (?='reseller' AND a.owner_id=?)",(user['role'],user['id'],user['role'],user['id'])))
+            return rows(db.execute('''
+                SELECT a.*, p.name AS package,
+                       COALESCE(a.state IN ('failed','provisioning') AND (
+                           SELECT j.state IN ('failed','interrupted') FROM jobs j
+                           WHERE j.account_id=a.id AND j.operation='account.create'
+                           ORDER BY j.id DESC LIMIT 1
+                       ), 0) AS can_retry
+                FROM accounts a JOIN packages p ON a.package_id=p.id
+                WHERE ?='admin' OR a.user_id=? OR (?='reseller' AND a.owner_id=?)
+                ''', (user['role'], user['id'], user['role'], user['id'])))
         privileged(user)
         db.execute('BEGIN IMMEDIATE')
         if user['role']=='reseller' and db.execute('SELECT count(*) FROM accounts WHERE owner_id=?',(user['id'],)).fetchone()[0]>=user['max_accounts']:
@@ -202,8 +211,22 @@ def api(env, body, db, headers):
         return c.enqueue(db,user,None,'service.restart',{'service':body.get('service')},ip)
     parts = path.strip('/').split('/')
     if len(parts)==4 and parts[:2]==['api','accounts'] and parts[2].isdigit():
-        account = c.scoped_account(db,user,int(parts[2]))
         action = parts[3]
+        retry = action == 'retry-create' and method == 'POST'
+        if retry:
+            privileged(user)
+            db.execute('BEGIN IMMEDIATE')
+        account = c.scoped_account(db,user,int(parts[2]))
+        if retry:
+            aid = account['id']
+            last = db.execute("SELECT state FROM jobs WHERE account_id=? AND operation='account.create' ORDER BY id DESC LIMIT 1", (aid,)).fetchone()
+            if (not last or last['state'] not in ('failed', 'interrupted') or
+                    account['state'] not in ('failed', 'provisioning')):
+                raise c.Problem('Only a failed or interrupted account setup can be retried.', 409)
+            if db.execute("SELECT 1 FROM jobs WHERE account_id=? AND state IN ('queued','running')", (aid,)).fetchone():
+                raise c.Problem('Wait for existing jobs.', 409)
+            db.execute("UPDATE accounts SET state='provisioning' WHERE id=?", (aid,))
+            return c.enqueue(db, user, aid, 'account.create', {'name': account['name'], 'retry': True}, ip)
         if action=='state' and method=='POST':
             privileged(user)
             if account['state'] not in ('active','suspended'):

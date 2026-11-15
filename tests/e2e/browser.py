@@ -57,6 +57,12 @@ with tempfile.TemporaryDirectory() as temp:
                 package = db.execute("SELECT id FROM packages WHERE name='Browser package'").fetchone()[0]
                 db.execute("""INSERT INTO accounts(user_id,name,owner_id,package_id,state,created)
                               VALUES(?, 'browserhost', ?, ?, 'active', 0)""", (actor, actor, package))
+                user = db.execute("""INSERT INTO users(username,password,role,owner_id,enabled,created)
+                    VALUES('retryhost',?,'user',?,0,0)""", (c.password_hash(password), actor)).lastrowid
+                failed = db.execute("""INSERT INTO accounts(user_id,name,owner_id,package_id,state,created)
+                    VALUES(?,'retryhost',?,?,'failed',0)""", (user, actor, package)).lastrowid
+                db.execute("""INSERT INTO jobs(actor_id,account_id,operation,payload,state,created)
+                    VALUES(?,?,'account.create','{}','failed',0)""", (actor, failed))
             def browser_mail(route):
                 if route.request.method == 'GET':
                     route.fulfill(json={'available': True, 'hostname': 'mail.example.com', 'listen': 'loopback',
@@ -68,6 +74,14 @@ with tempfile.TemporaryDirectory() as temp:
                     route.fulfill(json={'message': 'Mail configuration saved.'})
             page.route('**/api/accounts/*/mail', browser_mail)
             page.reload()
+            page.get_by_role('link', name='Hosting Accounts', exact=True).click()
+            page.get_by_role('row').filter(has_text='retryhost').get_by_role('button', name='Retry setup').click()
+            page.get_by_role('button', name='Confirm', exact=True).click()
+            page.get_by_role('heading', name='Operation history').wait_for()
+            page.get_by_role('cell', name='queued', exact=True).wait_for()
+            with c.connect() as db:
+                queued = db.execute('SELECT payload FROM jobs WHERE account_id=? AND state=\'queued\'', (failed,)).fetchone()
+                assert json.loads(queued['payload']) == {'name': 'retryhost', 'retry': True}
             page.locator('#nav a[href="#mail"]').click()
             page.get_by_role('heading',name='Email Accounts').wait_for()
             page.get_by_text('Mail listeners accept only local connections.',exact=False).wait_for()

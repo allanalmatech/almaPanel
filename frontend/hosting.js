@@ -1196,3 +1196,47 @@ async function mailView(epoch) {
         }
     });
 }
+
+async function hostingAccountsView(epoch) {
+    await refreshAccounts();
+    const packages = await api('/packages');
+    if (epoch !== routeEpoch) return;
+    const canManage = me.role === 'admin' || me.role === 'reseller';
+    view('Hosting accounts', 'Provision isolated Linux users and PHP-FPM pools.',
+        `<section class="panel">${table(['Account', 'Package', 'State', 'Action'], accounts.map(item => {
+            const stateAction = item.state === 'active' ? 'Suspend' : 'Unsuspend';
+            let action = '<a href="#jobs">Review jobs</a>';
+            if (canManage && item.can_retry) action = `<button data-retry-account="${item.id}">Retry setup</button>`;
+            else if (canManage && ['active', 'suspended'].includes(item.state)) {
+                action = `<button data-state="${item.id}">${stateAction}</button>`;
+            }
+            return [esc(item.name), esc(item.package), esc(item.state), action];
+        }))}</section><section class="panel"><h2>Create hosting account</h2>
+        ${packages.length ? `<form id="account-form">
+        ${field('username', 'Username', 'text', 'pattern="[a-z][a-z0-9]{2,15}"')}
+        ${field('password', 'Panel password', 'password', 'minlength="14" autocomplete="new-password"')}
+        <label>Package<select name="package_id">${packages.map(item =>
+            `<option value="${item.id}">${esc(item.name)}</option>`).join('')}</select></label>
+        <button type="submit">Create account</button></form>` : 'Create a hosting package first.'}</section>`);
+    if (packages.length) form('#account-form', async fields => {
+        await api('/accounts', {...fields, package_id: Number(fields.package_id)});
+        location.hash = 'jobs';
+    });
+    const scope = $('#main');
+    actionHandler(scope, '[data-retry-account]', async button => {
+        const item = accounts.find(entry => entry.id === Number(button.dataset.retryAccount));
+        if (!await confirmed(`Retry setup for ${item.name}?`)) return;
+        await api(`/accounts/${item.id}/retry-create`, {});
+        location.hash = 'jobs';
+    });
+    actionHandler(scope, '[data-state]', async button => {
+        const item = accounts.find(entry => entry.id === Number(button.dataset.state));
+        const suspending = item.state === 'active';
+        const message = suspending
+            ? `Suspend ${item.name}? Existing requests and sessions may finish.`
+            : `Unsuspend ${item.name}?`;
+        if (!await confirmed(message)) return;
+        await api(`/accounts/${item.id}/state`, {state: suspending ? 'suspended' : 'active'});
+        location.hash = 'jobs';
+    });
+}
