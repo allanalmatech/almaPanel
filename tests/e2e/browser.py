@@ -150,7 +150,19 @@ with tempfile.TemporaryDirectory() as temp:
 
             (website / 'assets' / 'icons').mkdir(parents=True)
             (website / '.settings').write_text('visible when requested')
-            page.locator('#nav a[href="#files"]').click()
+            # File Manager opens in its own tab for the selected account, without the panel shell.
+            fm_link = page.locator('#nav a[data-file-manager]')
+            account_id = page.locator('#account-select').input_value()
+            assert fm_link.get_attribute('href') == f'#filemanager?account={account_id}'
+            assert fm_link.get_attribute('target') == f'alma-files-{account_id}'
+            with page.expect_popup() as popup:
+                fm_link.click()
+            panel = page
+            page = popup.value
+            page.on('pageerror', lambda e: errors.append(str(e)))
+            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            assert not page.locator('#sidebar').is_visible() and not page.locator('.workspace > header').is_visible()
+            assert page.locator('.fm-account').inner_text() == 'browserhost'
             page.get_by_text('used in this account', exact=False).wait_for()
             actions = page.get_by_role('toolbar', name='File actions')
             folder_nav = page.get_by_role('toolbar', name='Folder navigation')
@@ -213,23 +225,88 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('drop.txt · Uploaded', exact=True).wait_for()
             assert (folder / 'drop.txt').read_text() == 'dropped'
 
+            # Edit opens the file in its own full-page editor tab.
             select_only('file.php')
-            act('Edit')
-            page.locator('.source-editor .code-keyword').filter(has_text='echo').wait_for()
-            page.get_by_role('textbox', name='File contents').fill('<?php\necho "after";\n')
-            page.get_by_role('button', name='Save file', exact=True).click()
-            page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
+            with page.expect_popup() as editor_popup:
+                act('Edit')
+            editor = editor_popup.value
+            editor.on('pageerror', lambda e: errors.append(str(e)))
+            source = editor.get_by_role('textbox', name='File contents')
+            editor.locator('.source-editor .code-keyword').filter(has_text='echo').wait_for()
+            assert editor.locator('#ed-path').input_value() == 'public_html/assets/icons/file.php'
+            assert editor.locator('#ed-encoding').input_value() == 'utf-8'
+            assert editor.locator('#ed-language').input_value() == 'php'
+            assert editor.locator('.ed-lines div').count() == 3
+            assert not editor.locator('#sidebar').is_visible()
+            source.fill('<?php\necho "after";\n')
+            editor.wait_for_function("() => document.title.startsWith('● file.php')")
+            editor.get_by_role('button', name='Save Changes').click()
+            editor.locator('#ed-status').get_by_text('File saved.', exact=True).wait_for()
             assert (folder / 'file.php').read_bytes() == php.replace(b'before', b'after')
-            page.get_by_role('button', name='Close file', exact=True).click()
+            # The File Manager tab refreshes after the editor saves.
+            row('file.php').locator('.fm-col-size').get_by_text('25 B', exact=True).wait_for()
+
+            # Find and replace, Ctrl+S, undo, line wrapping and go to line.
+            source.click()
+            editor.keyboard.press('Control+f')
+            find = editor.get_by_role('search')
+            find.get_by_role('textbox', name='Find').fill('after')
+            find.get_by_role('textbox', name='Replace with').fill('again')
+            find.get_by_role('button', name='Replace all').click()
+            find.get_by_text('Replaced 1 match', exact=True).wait_for()
+            editor.keyboard.press('Control+s')
+            editor.locator('#ed-status').get_by_text('File saved.', exact=True).wait_for()
+            assert b'echo "again";' in (folder / 'file.php').read_bytes()
+            editor.get_by_role('button', name='Undo (Ctrl+Z)').click()
+            assert 'after' in source.input_value()
+            wrap = editor.get_by_role('button', name='Wrap long lines (Alt+Z)')
+            pressed = wrap.get_attribute('aria-pressed')
+            wrap.click()
+            assert wrap.get_attribute('aria-pressed') != pressed
+            editor.get_by_role('button', name='Go to line (Ctrl+G)').click()
+            editor.get_by_role('spinbutton', name='Line number (1–3)').fill('2')
+            editor.get_by_role('dialog', name='Go to line').get_by_role('button', name='Go').click()
+            editor.locator('#ed-cursor').get_by_text('Line 2, column 1', exact=False).wait_for()
+            editor.get_by_role('button', name='Keyboard shortcuts').click()
+            editor.get_by_role('dialog', name='Keyboard shortcuts').get_by_role('button', name='Close').click()
+            # Closing with unsaved changes asks first, then closes the tab.
+            editor.get_by_role('button', name='Close', exact=True).click()
+            editor.get_by_text('Close without saving your changes?').wait_for()
+            with editor.expect_event('close'):
+                editor.get_by_role('button', name='Confirm', exact=True).click()
+            assert b'echo "again";' in (folder / 'file.php').read_bytes()
+
+            # New file opens an editor tab; the file is created on the first save.
             act('New file')
             dialog = page.get_by_role('dialog', name='New file', exact=True)
             dialog.get_by_role('textbox', name='Name', exact=True).fill('created.txt')
-            dialog.get_by_role('button', name='Open editor', exact=True).click()
-            page.get_by_role('textbox', name='File contents').fill('created by File Manager')
-            page.get_by_role('button', name='Save file', exact=True).click()
-            page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
-            assert (folder / 'created.txt').read_text() == 'created by File Manager'
-            page.get_by_role('button', name='Close file', exact=True).click()
+            with page.expect_popup() as editor_popup:
+                dialog.get_by_role('button', name='Open editor', exact=True).click()
+            editor = editor_popup.value
+            editor.on('pageerror', lambda e: errors.append(str(e)))
+            editor.locator('#ed-status').get_by_text('New file. Save Changes creates it.').wait_for()
+            assert not (folder / 'created.txt').exists()
+            wrap = editor.get_by_role('button', name='Wrap long lines (Alt+Z)')
+            if wrap.get_attribute('aria-pressed') != 'true':
+                wrap.click()
+            created = 'created by File Manager ' * 20 + '\nsecond line'
+            editor.get_by_role('textbox', name='File contents').fill(created)
+            # A wrapped line's number keeps its full height, so later numbers stay aligned.
+            editor.wait_for_function('''() => {
+                const rows = document.querySelectorAll('.ed-lines div');
+                return rows.length === 2 && rows[0].getBoundingClientRect().height > 2 * rows[1].getBoundingClientRect().height;
+            }''')
+            editor.get_by_role('button', name='Save Changes').click()
+            editor.locator('#ed-status').get_by_text('File saved.', exact=True).wait_for()
+            assert (folder / 'created.txt').read_text() == created
+            assert 'new=1' not in editor.url
+            qa_shot_page = page
+            page = editor
+            qa_shot('editor')
+            page = qa_shot_page
+            with editor.expect_event('close'):
+                editor.get_by_role('button', name='Close', exact=True).click()
+            row('created.txt').wait_for()
 
             # Sorting by column header; folders stay first.
             page.locator('#file-list th').get_by_role('button', name='Name').click()
@@ -350,24 +427,34 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Confirm', exact=True).click()
             page.get_by_role('button', name='dropped.txt', exact=True).wait_for(state='hidden')
             page.get_by_role('button', name='pair.zip', exact=True).wait_for(state='hidden')
-            folder_nav.get_by_role('link', name='View Trash').click()
+            folder_nav.get_by_role('button', name='View Trash').click()
+            page.get_by_role('button', name='Trash', exact=True).wait_for()
             page.get_by_role('row').filter(has_text='dropped.txt').get_by_role('button', name='Restore', exact=True).click()
             page.get_by_role('button', name='Restore entry', exact=True).click()
             page.get_by_text('Entry restored.', exact=True).wait_for()
             assert (folder / 'dropped.txt').read_text() == 'dropped'
-            page.locator('#nav a[href="#files"]').click()
+            page.get_by_role('row').filter(has_text='pair.zip').wait_for()
             folder_nav.get_by_role('button', name='Empty Trash').click()
             page.get_by_text('Permanently delete all 1 item in Trash?', exact=False).wait_for()
             page.get_by_role('button', name='Confirm', exact=True).click()
             page.get_by_text('Permanently deleted 1 of 1 Trash items.', exact=True).wait_for()
             assert not any((private / 'trash').iterdir())
+            page.get_by_text('Trash is empty.', exact=True).wait_for()
+            page.get_by_role('button', name='Back to icons').click()
+            row('dropped.txt').wait_for()
+            # Reloading the tab keeps the current folder.
+            page.reload()
+            crumbs_now.get_by_text('icons', exact=True).wait_for()
             page.set_viewport_size({'width': 412, 'height': 860})
-            page.evaluate("() => { location.hash = 'files'; }")
-            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
             page.locator('#file-list tbody tr').first.wait_for()
             qa_shot('file-manager-mobile')
             assert page.evaluate('() => document.documentElement.scrollWidth === document.documentElement.clientWidth')
             page.set_viewport_size({'width': 1440, 'height': 1000})
+            page.close()
+            page = panel
+            # The panel's own File Manager page offers a link to the tab.
+            page.evaluate("() => { location.hash = 'files'; }")
+            page.get_by_role('link', name='Open File Manager').wait_for()
             file_fixture.stop()
             offsite_status = {'state': 'succeeded', 'message': 'Encrypted website snapshot saved.'}
 
@@ -412,7 +499,7 @@ with tempfile.TemporaryDirectory() as temp:
             total = page.locator('.tool').count()
             assert page.locator('#tool-count').inner_text() == f'{total} tools in 12 groups'
             page.locator('#search').fill('file manager')
-            page.locator('.tool[href="#files"]').wait_for()
+            page.locator('.tool[data-file-manager]').wait_for()
             assert page.locator('.tool').count()==1
             assert page.locator('#tool-count').inner_text() == f'1 of {total} tools match “file manager”'
             page.locator('#search').fill('advanced')  # category name only
@@ -434,9 +521,9 @@ with tempfile.TemporaryDirectory() as temp:
             assert page.title() == 'Feature Availability · almaPanel'
             assert 'active' in page.locator('#nav a[href="#dashboard"]').get_attribute('class')
             assert page.locator('#nav a[aria-current=page]').count() == 0
-            page.locator('#nav a[href="#files"]').click()
-            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
-            assert page.locator('#nav a[aria-current=page]').get_attribute('href') == '#files'
+            page.locator('#nav a[href="#preferences"]').click()
+            page.get_by_role('heading', name='Two-factor authentication').wait_for()
+            assert page.locator('#nav a[aria-current=page]').get_attribute('href') == '#preferences'
             assert 'active' not in (page.locator('#nav a[href="#dashboard"]').get_attribute('class') or '')
             page.locator('#nav a[href="#dashboard"]').click()
 
@@ -480,8 +567,8 @@ with tempfile.TemporaryDirectory() as temp:
             page.reload()
             page.get_by_role('heading', name='Dashboard', exact=True).wait_for()
             assert 'collapsed' in page.locator('body').get_attribute('class')
-            page.get_by_role('link', name='File Manager', exact=True).click()
-            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            page.get_by_role('link', name='Preferences', exact=True).click()
+            page.get_by_role('heading', name='Two-factor authentication').wait_for()
             page.get_by_role('button', name='Expand navigation').click()
             assert 'collapsed' not in page.locator('body').get_attribute('class')
             page.wait_for_function("() => document.getElementById('sidebar').getBoundingClientRect().width > 150")

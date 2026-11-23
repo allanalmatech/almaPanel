@@ -80,6 +80,22 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.13
+
+- Open File Manager in its own full-page browser tab for the selected hosting
+  account. The panel sidebar and dashboard link reuse one tab per account,
+  and reloading the tab keeps the current folder.
+- Open text files in a separate full-page editor tab, one per file. The tab has:
+  - Editing path, Encoding (UTF-8), Re-open, Save Changes and Close
+  - line numbers that follow wrapped lines
+  - find and replace, go to line, undo and redo
+  - a line-wrap toggle, font size and highlighting mode
+  - a keyboard shortcuts list
+- Create new files in the editor tab; the file is created on the first save.
+- File Manager refreshes the open folder when an editor tab saves into it.
+- Show Trash inside the File Manager tab with restore and permanent deletion.
+- Images, audio, video and ZIP files still preview inside File Manager.
+
 ## 0.1.0-alpha.12
 
 - Redesign File Manager with a search bar scoped to all files or the current

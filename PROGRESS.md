@@ -290,3 +290,21 @@ failure.
   filesystem fixture, plus all earlier navigation, mail, backup, DNS and
   preference checks.
 - Installed Amazon Linux acceptance of the bulk operations is pending.
+
+## 2026-11-23 · 0.1.0-alpha.13
+
+The owner asked for File Manager and the editor to open fully in separate tabs.
+The panel's File Manager link now opens `#filemanager?account=ID` in a tab
+named for the account. That page hides the panel shell and fills the window.
+Edit, View for text, New file and text file names open `#editor?account=ID&file=…`
+in a tab named for the file. The editor follows the reference layout, with
+original controls and styling. It keeps the existing revision-checked UTF-8
+save path and the 1 MiB limit. Line numbers measure wrapped lines so they stay
+aligned. Saves are announced through a BroadcastChannel, and File Manager
+refreshes the matching folder. Trash now opens inside the File Manager tab.
+Media and ZIP previews stay inline. No API or agent changes.
+
+- `make check` passed 81 tests.
+- The Chromium suite passed with real pop-up tabs for File Manager and the
+  editor, including the cross-tab refresh, unsaved-change prompts and
+  wrapped-line numbering.

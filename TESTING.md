@@ -44,6 +44,21 @@ Since alpha.12 the File Manager section also covers:
 - A multi-entry ZIP checked member by member, multi-entry deletion to Trash,
   restoring from View Trash, and Empty Trash.
 
+Since alpha.13 the suite also checks:
+
+- The File Manager link's per-account target, and the File Manager opening
+  as a real pop-up tab without the panel shell.
+- That reloading the tab keeps the folder, and Trash inside the tab.
+- The editor tab:
+  - the path, encoding and highlighting mode, and the line count
+  - the unsaved marker in the title
+  - Save Changes and Ctrl+S
+  - the File Manager refreshing after a save
+  - find and replace, undo, wrap, go to line and the shortcuts dialog
+  - Close asking before discarding changes
+  - creating a new file on the first save
+  - wrapped-line numbering.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

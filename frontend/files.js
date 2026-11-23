@@ -307,6 +307,7 @@ async function fileManagerView(epoch) {
     let sortAscending = true;
     let anchor = null;
     let treeExpandTo = null;
+    let mode = 'files';
     const chosen = new Set();
     const past = [];
     const ahead = [];
@@ -314,9 +315,11 @@ async function fileManagerView(epoch) {
 
     const tool = (cmd, label, iconName, extra = '') =>
         '<button type="button" class="fm-btn" data-cmd="' + cmd + '" title="' + label + '"' + extra + '>' + fmIcon(iconName) + '<span>' + label + '</span></button>';
-    view('File Manager', 'Manage the files in your website folder, public_html.',
-        '<div class="fm">' +
-        '<div class="fm-head"><p id="file-storage" role="status">Loading storage usage…</p>' +
+    document.title = 'File Manager · ' + account.name + ' · almaPanel';
+    $('#main').innerHTML = '<div class="fm fm-page">' +
+        '<div class="fm-head"><div class="fm-brand"><img src="/logo.svg" alt=""><h1>File Manager</h1></div>' +
+        '<span class="fm-account" title="Hosting account">' + esc(account.name) + '</span>' +
+        '<p id="file-storage" role="status">Loading storage usage…</p>' +
         '<form id="file-search" class="fm-search" role="search"><label for="fm-scope">Search</label>' +
         '<select id="fm-scope" name="scope" aria-label="Search scope"><option value="all">All your files</option>' +
         '<option value="current">Current folder</option></select><label for="fm-query">for</label>' +
@@ -338,7 +341,7 @@ async function fileManagerView(epoch) {
         fmIcon('home') + '</button><input name="folder" maxlength="2048" placeholder="public_html" aria-label="Folder path">' +
         '<button type="submit" class="subtle">Go</button></form>' +
         '<button type="button" class="subtle fm-collapse" id="fm-collapse">Collapse All</button>' +
-        '<nav id="file-tree" aria-label="Folder tree"></nav><a class="fm-usage" href="#usage">Disk Usage</a></aside>' +
+        '<nav id="file-tree" aria-label="Folder tree"></nav></aside>' +
         '<section class="fm-main" id="drop-files" aria-label="Folder contents">' +
         '<div class="fm-nav" role="toolbar" aria-label="Folder navigation">' +
         tool('home', 'Home', 'home') + tool('up', 'Up One Level', 'up') + tool('back', 'Back', 'back') +
@@ -346,7 +349,7 @@ async function fileManagerView(epoch) {
         '<span class="fm-sep" aria-hidden="true"></span>' +
         tool('selectall', 'Select All', 'selectAll') + tool('selectnone', 'Unselect All', 'selectNone') +
         '<span class="fm-sep" aria-hidden="true"></span>' +
-        '<a class="fm-btn" href="#trash" title="View Trash">' + fmIcon('trash') + '<span>View Trash</span></a>' +
+        tool('trash', 'View Trash', 'trash') +
         tool('emptytrash', 'Empty Trash', 'emptyTrash') + '</div>' +
         '<nav class="file-crumbs" id="file-crumbs" aria-label="Current folder"></nav>' +
         '<div id="file-results" aria-live="polite"></div><div id="file-transfers" aria-live="polite"></div>' +
@@ -355,7 +358,7 @@ async function fileManagerView(epoch) {
         '<div class="fm-status"><p id="file-page-status" role="status"></p><div class="toolbar" id="file-pages"></div></div>' +
         '<section id="file-open" class="file-open" hidden><div class="file-open-head"><h2 id="file-open-title"></h2>' +
         '<button id="close-file" class="subtle">Close file</button></div><div id="file-preview-content"></div></section>' +
-        '</section></div></div>');
+        '</section></div></div>';
     const folderForm = $('#file-location');
     const listing = $('#file-list');
     const pages = $('#file-pages');
@@ -431,6 +434,7 @@ async function fileManagerView(epoch) {
             row.setAttribute('aria-selected', String(isChosen));
             row.querySelector('input[type=checkbox]').checked = isChosen;
         }
+        if (mode === 'trash') return;
         const range = page.total ? (offset + 1) + '–' + (offset + page.entries.length) + ' of ' + page.total + ' items' : 'This folder is empty.';
         status.textContent = range + (items.length ? ' · ' + items.length + ' selected' : '') +
             (page.next_offset !== null || offset ? ' · Sorting applies to this page' : '');
@@ -557,6 +561,8 @@ async function fileManagerView(epoch) {
             const changed = result.path !== current;
             currentPath = current = result.path;
             page = result;
+            mode = 'files';
+            history.replaceState(null, '', fileManagerUrl(current));  // Reloading this tab keeps the folder.
             offset = nextOffset;
             if (changed) {
                 closePreview();
@@ -632,7 +638,21 @@ async function fileManagerView(epoch) {
         await listZip();
     }
 
-    async function openFile(location, size, create = false) {
+    const previewable = location => {
+        const extension = location.split('.').at(-1).toLowerCase();
+        return extension === 'zip' || Object.hasOwn(mediaFiles, extension);
+    };
+
+    // Text files open in their own editor tab; images, audio, video and ZIPs preview here.
+    // Runs synchronously up to window.open so the browser treats it as the user's click.
+    function openFile(location, size) {
+        if (previewable(location)) return previewFile(location);
+        if (size > 1048576) return Promise.reject(Error('Files larger than 1 MiB are available through Download.'));
+        openEditorTab(account.id, location);
+        return Promise.resolve();
+    }
+
+    async function previewFile(location) {
         if (!await checkChanges() || !active()) return;
         closePreview();
         const preview = new AbortController();
@@ -646,7 +666,7 @@ async function fileManagerView(epoch) {
         const extension = location.split('.').at(-1).toLowerCase();
         const media = Object.hasOwn(mediaFiles, extension) ? mediaFiles[extension] : null;
         try {
-            if (media && !create) {
+            if (media) {
                 const chunks = await readLargeFile(path, 'download', location,
                     {maxBytes: 24 * 1024 * 1024, active: stillOpen});
                 if (!stillOpen()) return;
@@ -655,32 +675,8 @@ async function fileManagerView(epoch) {
                     await sendFileUpload(path, dest, blob, stillOpen);
                     await refresh();
                 });
-            } else if (extension === 'zip' && !create) {
-                await previewZip(location, stillOpen);
             } else {
-                if (!create && size > 1048576) throw Error('Files larger than 1 MiB are available through Download.');
-                const result = create ? {content: ''} : await filePath(path, 'read', {path: location});
-                if (!stillOpen()) return;
-                let source;
-                try {
-                    source = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(
-                        Uint8Array.from(atob(result.content), character => character.charCodeAt(0)));
-                    if (/[\u0000-\u0008\u000e-\u001a]/.test(source)) throw Error('Binary data');
-                } catch {
-                    throw Error('This file is not UTF-8 text. Use Download.');
-                }
-                let revision = result.revision;
-                isDirty = mountFileEditor(content, location, source, async bytes => {
-                    if (!stillOpen()) throw Error('This editor was closed.');
-                    const saved = await filePath(path, 'write', {path: location, content: bytesToBase64(bytes),
-                        create_only: create, expected_revision: revision});
-                    revision = saved.revision;
-                    if (create) {
-                        create = false;
-                        await refresh();
-                    }
-                    return saved;
-                });
+                await previewZip(location, stillOpen);
             }
         } catch (error) {
             if (stillOpen()) {
@@ -690,6 +686,42 @@ async function fileManagerView(epoch) {
                 content.replaceChildren(message);
             }
         }
+    }
+
+    // Trash is shown inside this tab; navigating to any folder leaves it.
+    async function showTrash() {
+        const items = await filePath(path, 'trash_list');
+        if (!active()) return;
+        mode = 'trash';
+        closePreview();
+        chosen.clear();
+        rows = [];
+        const back = leafFileName(current) || 'public_html';
+        $('#file-crumbs').innerHTML = '<button type="button" class="subtle" data-exit-trash>← Back to ' + esc(back) + '</button>' +
+            '<span aria-hidden="true">/</span><button type="button" class="subtle" aria-current="page">Trash</button>';
+        actionHandler($('#file-crumbs'), '[data-exit-trash]', async () => openFolder(current));
+        listing.innerHTML = '<table class="fm-table fm-trash"><thead><tr><th class="fm-trash-path">Original path</th><th>Actions</th></tr></thead><tbody>' +
+            (items.length ? items.map((item, index) => '<tr><td class="fm-trash-path">' + esc(item.path) + '</td><td>' +
+                '<button class="subtle" data-trash-restore="' + index + '">Restore</button> ' +
+                '<button class="subtle" data-trash-delete="' + index + '">Delete permanently</button></td></tr>').join('')
+                : '<tr><td colspan="2" class="fm-empty">Trash is empty.</td></tr>') + '</tbody></table>';
+        pages.replaceChildren();
+        updateTools();
+        status.textContent = items.length + (items.length === 1 ? ' item' : ' items') + ' in Trash. Restore an item or delete it permanently.';
+        actionHandler(listing, '[data-trash-restore]', async button => {
+            const item = items[Number(button.dataset.trashRestore)];
+            chooseFileTarget(path, 'Restore from Trash', parentFilePath(item.path), leafFileName(item.path),
+                'Restore entry', async destination => {
+                    notice((await filePath(path, 'trash_restore', {id: item.id, destination})).message);
+                    if (active() && mode === 'trash') await showTrash();
+                });
+        });
+        actionHandler(listing, '[data-trash-delete]', async button => {
+            const item = items[Number(button.dataset.trashDelete)];
+            if (!await confirmed('Permanently delete ' + item.path + '? This cannot be undone.')) return;
+            notice((await filePath(path, 'trash_purge', {id: item.id})).message);
+            if (active() && mode === 'trash') await showTrash();
+        });
     }
 
     async function download(entry) {
@@ -748,7 +780,7 @@ async function fileManagerView(epoch) {
         const items = selection();
         const one = items[0];
         if (cmd === 'newfile') {
-            chooseFileTarget(path, 'New file', current, '', 'Open editor', destination => openFile(destination, 0, true));
+            chooseFileTarget(path, 'New file', current, '', 'Open editor', destination => openEditorTab(account.id, destination, true));
         } else if (cmd === 'newfolder') {
             chooseFileTarget(path, 'New folder', current, '', 'Create folder', destination => runFileAction('mkdir', {path: destination}));
         } else if (cmd === 'upload') {
@@ -818,8 +850,11 @@ async function fileManagerView(epoch) {
         } else if (cmd === 'selectnone') {
             chosen.clear();
             updateTools();
+        } else if (cmd === 'trash') {
+            await showTrash();
         } else if (cmd === 'emptytrash') {
             await emptyTrash();
+            if (active() && mode === 'trash') await showTrash();
         } else if (cmd === 'settings') {
             settingsDialog();
         }
@@ -880,6 +915,8 @@ async function fileManagerView(epoch) {
         } finally {
             cancel.remove();
             batch = null;
+            // Clear the finished transfer list unless another batch has started.
+            setTimeout(() => { if (!batch && list.isConnected) transferField.replaceChildren(); }, 10000);
         }
     }
 
@@ -930,6 +967,10 @@ async function fileManagerView(epoch) {
         drop.classList.remove('dropping');
         upload([...event.dataTransfer.files]).catch(error => notice(error.message));
     };
+    // Editor tabs announce saves; refresh when the saved file is in the folder shown here.
+    fileChannel?.addEventListener('message', event => {
+        if (active() && mode === 'files' && event.data?.account === account.id && event.data.folder === current) refresh();
+    }, {signal: controller.signal});
     await load(current);
     if (active()) {
         mountTree();

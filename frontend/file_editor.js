@@ -82,77 +82,436 @@ function paintSource(source, language, code) {
     return true;
 }
 
-function mountFileEditor(panel, location, source, save) {
-    const extension = location.split('.').at(-1).toLowerCase();
-    const language = Object.hasOwn(codeExtensions, extension) ? codeExtensions[extension] : 'text';
-    const bom = source.charCodeAt(0) === 0xfeff ? '\ufeff' : '';
-    const original = bom ? source.slice(1) : source;
-    const eol = original.includes('\r\n') && !original.replaceAll('\r\n', '').includes('\n') ? '\r\n' : '\n';
-    panel.innerHTML = '<form class="file-editor-form"><div class="toolbar">' +
-        '<button type="submit">Save file</button><label>Language<select name="language">' +
-        Object.entries(codeLanguages).map(([key, label]) =>
-            '<option value="' + key + '">' + label + '</option>').join('') +
-        '</select></label><span class="muted" data-cursor></span></div>' +
-        '<div class="source-editor"><pre aria-hidden="true"><code></code></pre>' +
-        '<textarea aria-label="File contents" name="content" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div>' +
-        '<p data-editor-status role="status" class="muted"></p></form>';
-    const form = panel.querySelector('form');
-    const input = form.elements.content;
+const editorPrefsKey = 'alma-editor';
+const editorFontSizes = [11, 12, 13, 14, 15, 16, 18, 20];
+const editorUrl = (accountId, file, create = false) =>
+    '#editor?account=' + accountId + '&file=' + encodeURIComponent(file) + (create ? '&new=1' : '');
+const editorWindowName = (accountId, file) => 'alma-edit-' + accountId + '-' + file;
+const fileChannel = 'BroadcastChannel' in window ? new BroadcastChannel('alma-files') : null;
+const EDITOR_ICONS = {
+    find: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>',
+    goto: '<path d="M2 4l4 4-4 4M8 13h6"/>',
+    undo: '<path d="M5.5 3.5L2.5 6.5l3 3M2.5 6.5H10a3.5 3.5 0 0 1 0 7H7"/>',
+    redo: '<path d="M10.5 3.5l3 3-3 3M13.5 6.5H6a3.5 3.5 0 0 0 0 7h3"/>',
+    wrap: '<path d="M2 4h12M2 8h9a2 2 0 0 1 0 4H8M9.5 10.5L8 12l1.5 1.5M2 12h3"/>'
+};
+const editorIcon = name => '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true" focusable="false">' + EDITOR_ICONS[name] + '</svg>';
+
+function editorPrefs() {
+    try { return {wrap: true, fontSize: 13, ...JSON.parse(localStorage.getItem(editorPrefsKey) || '{}')}; }
+    catch { return {wrap: true, fontSize: 13}; }
+}
+
+// Open a file in its own editor tab; reopening the same file reuses that tab.
+function openEditorTab(accountId, file, create = false) {
+    const url = editorUrl(accountId, file, create);
+    const tab = window.open(url, editorWindowName(accountId, file));
+    if (!tab) location.hash = url;  // Pop-up blocked: open the editor here; Close returns to File Manager.
+    else tab.focus();
+}
+
+async function fileEditorPage(epoch, params) {
+    const base = boundAccount();
+    const path = base + 'files';
+    const location = String(params.get('file') || '').split('/').filter(Boolean).join('/');
+    if (!location) throw Error('Choose a file to edit from File Manager.');
+    let create = params.get('new') === '1';
+    const active = () => Boolean(me && activeView(epoch, base));
+    const prefs = editorPrefs();
+    const name = leafFileName(location);
+    const extension = name.includes('.') ? name.split('.').at(-1).toLowerCase() : '';
+    const tool = (key, label) => '<button type="button" class="ed-icon" data-ed="' + key + '" aria-label="' + label +
+        '" title="' + label + '">' + editorIcon(key) + '</button>';
+    $('#main').innerHTML = '<div class="ed" id="editor-page">' +
+        '<header class="ed-bar"><label class="ed-field">Editing:<input id="ed-path" readonly value="public_html/' + esc(location) + '"></label>' +
+        '<label class="ed-field">Encoding:<select id="ed-encoding" title="almaPanel edits files as UTF-8 text"><option value="utf-8">utf-8</option></select></label>' +
+        '<button type="button" class="subtle" id="ed-reopen">Re-open</button>' +
+        '<p id="ed-status" class="ed-status" role="status" data-editor-status></p>' +
+        '<button type="button" id="ed-save">Save Changes</button><button type="button" class="subtle" id="ed-close">Close</button></header>' +
+        '<div class="ed-tools" role="toolbar" aria-label="Editor tools">' +
+        '<button type="button" class="ed-link" id="ed-help">Keyboard shortcuts</button>' +
+        '<div class="ed-group">' + tool('find', 'Find and replace (Ctrl+F)') + tool('goto', 'Go to line (Ctrl+G)') + '</div>' +
+        '<div class="ed-group">' + tool('undo', 'Undo (Ctrl+Z)') + tool('redo', 'Redo (Ctrl+Y)') + '</div>' +
+        tool('wrap', 'Wrap long lines (Alt+Z)') +
+        '<select id="ed-font" aria-label="Font size">' + editorFontSizes.map(size => '<option value="' + size + '">' + size + 'px</option>').join('') + '</select>' +
+        '<select id="ed-language" aria-label="Highlighting mode">' + Object.entries(codeLanguages).map(([key, label]) =>
+            '<option value="' + key + '">' + label + '</option>').join('') + '</select>' +
+        '<span id="ed-cursor" class="ed-cursor"></span></div>' +
+        '<form class="ed-find" id="ed-find" role="search" hidden><input name="find" aria-label="Find" placeholder="Find" maxlength="1000">' +
+        '<input name="replace" aria-label="Replace with" placeholder="Replace with" maxlength="1000">' +
+        '<label class="file-check"><input type="checkbox" name="matchCase"> Match case</label>' +
+        '<button type="submit">Next</button><button type="button" class="subtle" data-find="previous">Previous</button>' +
+        '<button type="button" class="subtle" data-find="replace">Replace</button><button type="button" class="subtle" data-find="all">Replace all</button>' +
+        '<span id="ed-matches" role="status"></span><button type="button" class="subtle" data-find="close" aria-label="Close find">×</button></form>' +
+        '<div class="ed-body"><div class="ed-gutter" aria-hidden="true"><div class="ed-lines"></div></div>' +
+        '<div class="source-editor ed-source"><pre aria-hidden="true"><code></code></pre>' +
+        '<textarea aria-label="File contents" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>' +
+        '<div class="ed-measure" aria-hidden="true"></div></div></div></div>';
+    const page = $('#editor-page');
+    const input = page.querySelector('textarea');
     const frame = input.parentElement;
     const preview = frame.querySelector('pre');
-    const button = form.querySelector('[type=submit]');
-    const message = form.querySelector('[data-editor-status]');
-    input.value = original;
-    form.elements.language.value = language;
-    let saved = input.value;
+    const gutter = page.querySelector('.ed-gutter');
+    const lines = page.querySelector('.ed-lines');
+    const measure = page.querySelector('.ed-measure');
+    const findForm = $('#ed-find');
+    const saveButton = $('#ed-save');
+    const languageField = $('#ed-language');
+    const fontField = $('#ed-font');
+    let bom = '';
+    let eol = '\n';
+    let revision = '';
+    let saved = '';
+    let editable = false;
+    let saving = false;
     let scheduled = false;
-    const syncScroll = () => {
+    let lineCount = 0;
+    let measuredFor = '';
+    let currentLine = -1;
+    let tabLeavesEditor = false;
+    const dirty = () => editable && input.value !== saved;
+    fileViewHasUnsavedChanges = () => active() && dirty();
+    closeFileView = () => { fileViewHasUnsavedChanges = () => false; };
+    languageField.value = Object.hasOwn(codeExtensions, extension) ? codeExtensions[extension] : 'text';
+    fontField.value = editorFontSizes.includes(Number(prefs.fontSize)) ? prefs.fontSize : 13;
+
+    const setStatus = text => { $('#ed-status').textContent = text; };
+    const storePrefs = () => {
+        try { localStorage.setItem(editorPrefsKey, JSON.stringify({wrap: prefs.wrap, fontSize: Number(fontField.value)})); }
+        catch { /* Preferences are per browser only. */ }
+    };
+
+    function applyView() {
+        page.classList.toggle('wrap', prefs.wrap);
+        input.wrap = prefs.wrap ? 'soft' : 'off';
+        page.style.setProperty('--ed-font', fontField.value + 'px');
+        const wrap = page.querySelector('[data-ed=wrap]');
+        wrap.setAttribute('aria-pressed', String(prefs.wrap));
+        measuredFor = '';
+        update();
+    }
+
+    // Line numbers: one row per source line; wrapped lines take their measured height.
+    function renderGutter() {
+        const value = input.value;
+        let count = 1;
+        for (let index = value.indexOf('\n'); index !== -1; index = value.indexOf('\n', index + 1)) count += 1;
+        if (count !== lineCount) {
+            const fragment = document.createDocumentFragment();
+            for (let line = 1; line <= count; line += 1) {
+                const row = document.createElement('div');
+                row.textContent = line;
+                fragment.append(row);
+            }
+            lines.replaceChildren(fragment);
+            lineCount = count;
+            currentLine = -1;
+            measuredFor = '';
+        }
+        const key = prefs.wrap ? value + '\u0000' + input.clientWidth + '\u0000' + fontField.value : 'nowrap';
+        if (key !== measuredFor) {
+            measuredFor = key;
+            if (prefs.wrap) {
+                measure.style.width = input.clientWidth + 'px';
+                const fragment = document.createDocumentFragment();
+                for (const text of value.split('\n')) {
+                    const row = document.createElement('div');
+                    row.textContent = text || ' ';
+                    fragment.append(row);
+                }
+                measure.replaceChildren(fragment);
+                const heights = [...measure.children].map(row => row.getBoundingClientRect().height);
+                measure.replaceChildren();
+                [...lines.children].forEach((row, index) => { row.style.height = heights[index] + 'px'; });
+            } else {
+                for (const row of lines.children) row.style.height = '';
+            }
+        }
+    }
+
+    function syncScroll() {
         preview.scrollTop = input.scrollTop;
         preview.scrollLeft = input.scrollLeft;
-    };
+        gutter.scrollTop = input.scrollTop;
+    }
+
     function update() {
         if (scheduled) return;
         scheduled = true;
         requestAnimationFrame(() => {
             scheduled = false;
-            if (!frame.isConnected) return;
-            frame.classList.toggle('highlighted', paintSource(input.value, form.elements.language.value, preview.firstElementChild));
-            syncScroll();
+            if (!input.isConnected) return;
+            // Keep the highlight layer the same size as the text area's visible text.
+            preview.style.right = (input.offsetWidth - input.clientWidth) + 'px';
+            preview.style.bottom = (input.offsetHeight - input.clientHeight) + 'px';
+            frame.classList.toggle('highlighted', paintSource(input.value, languageField.value, preview.firstElementChild));
+            renderGutter();
             const prefix = input.value.slice(0, input.selectionStart);
-            form.querySelector('[data-cursor]').textContent =
-                'Line ' + prefix.split('\n').length + ', column ' + (prefix.length - prefix.lastIndexOf('\n'));
+            const line = prefix.split('\n').length;
+            if (line !== currentLine) {
+                lines.children[currentLine - 1]?.classList.remove('current');
+                lines.children[line - 1]?.classList.add('current');
+                currentLine = line;
+            }
+            $('#ed-cursor').textContent = 'Line ' + line + ', column ' + (prefix.length - prefix.lastIndexOf('\n')) +
+                ' · ' + lineCount + (lineCount === 1 ? ' line' : ' lines');
+            document.title = (dirty() ? '● ' : '') + name + ' · Editor · almaPanel';
+            saveButton.classList.toggle('pending', dirty());
+            syncScroll();
         });
     }
-    input.oninput = input.onkeyup = input.onpointerup = input.onselect = update;
-    input.onscroll = syncScroll;
-    form.elements.language.onchange = update;
-    input.onkeydown = event => {
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-            event.preventDefault();
-            if (!button.disabled) form.requestSubmit();
+
+    function scrollToCaret() {
+        renderGutter();
+        const line = input.value.slice(0, input.selectionStart).split('\n').length;
+        const row = lines.children[line - 1];
+        if (row) {
+            const top = row.offsetTop;
+            if (top < input.scrollTop || top + row.offsetHeight > input.scrollTop + input.clientHeight) {
+                input.scrollTop = Math.max(0, top - input.clientHeight / 3);
+            }
         }
-    };
-    form.onsubmit = async event => {
-        event.preventDefault();
-        if (button.disabled) return;
-        button.disabled = true;
-        message.textContent = 'Saving…';
+        update();
+    }
+
+    function select(start, end) {
+        input.focus();
+        input.setSelectionRange(start, end);
+        scrollToCaret();
+    }
+
+    // Replace text through the browser's editing commands so Undo still works.
+    function insertText(text) {
+        input.focus();
+        if (!document.execCommand('insertText', false, text)) input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end');
+        update();
+    }
+
+    async function loadFile() {
+        editable = false;
+        input.readOnly = true;
+        saveButton.disabled = true;
+        if (create) {
+            bom = '';
+            eol = '\n';
+            revision = '';
+            input.value = saved = '';
+            setStatus('New file. Save Changes creates it.');
+        } else {
+            setStatus('Opening file…');
+            const result = await filePath(path, 'read', {path: location});
+            if (!active()) return;
+            let source;
+            try {
+                source = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(
+                    Uint8Array.from(atob(result.content), character => character.charCodeAt(0)));
+                if (/[\u0000-\u0008\u000e-\u001a]/.test(source)) throw Error('Binary data');
+            } catch {
+                throw Error('This file is not UTF-8 text. Download it from File Manager instead.');
+            }
+            bom = source.charCodeAt(0) === 0xfeff ? '﻿' : '';
+            const original = bom ? source.slice(1) : source;
+            eol = original.includes('\r\n') && !original.replaceAll('\r\n', '').includes('\n') ? '\r\n' : '\n';
+            input.value = original;
+            saved = input.value;
+            revision = result.revision;
+            setStatus('Opened.');
+        }
+        editable = true;
+        input.readOnly = false;
+        saveButton.disabled = false;
+        input.setSelectionRange(0, 0);
+        input.scrollTop = 0;
+        input.focus();
+        update();
+    }
+
+    async function save() {
+        if (saving || !editable) return;
+        saving = true;
+        saveButton.disabled = true;
+        setStatus('Saving…');
         try {
             const value = input.value;
             const bytes = new TextEncoder().encode(bom + value.replaceAll('\n', eol));
-            if (bytes.length > 1048576) throw Error('The text editor supports files up to 1 MiB.');
-            const result = await save(bytes);
+            if (bytes.length > 1048576) throw Error('The editor supports files up to 1 MiB.');
+            const result = await filePath(path, 'write', {path: location, content: bytesToBase64(bytes),
+                create_only: create, ...(create ? {} : {expected_revision: revision})});
+            revision = result.revision;
             saved = value;
-            message.textContent = result.message;
+            if (create) {
+                create = false;
+                history.replaceState(null, '', editorUrl(account.id, location));
+            }
+            setStatus(result.message);
+            fileChannel?.postMessage({account: account.id, folder: parentFilePath(location)});
         } catch (error) {
-            message.textContent = error.message;
+            setStatus(error.message);
         } finally {
-            button.disabled = false;
+            saving = false;
+            saveButton.disabled = !editable;
+            update();
         }
+    }
+
+    async function closeEditor() {
+        if (dirty() && !await confirmed('Close without saving your changes?')) return;
+        editable = false;
+        fileViewHasUnsavedChanges = () => false;
+        window.close();
+        // Tabs the browser will not close (for example one opened by hand) return to File Manager.
+        setTimeout(() => { if (!window.closed) location.hash = fileManagerUrl(parentFilePath(location)); }, 200);
+    }
+
+    function findNext(backwards = false) {
+        const needle = findForm.elements.find.value;
+        const counter = $('#ed-matches');
+        if (!needle) { counter.textContent = ''; return false; }
+        const matchCase = findForm.elements.matchCase.checked;
+        const text = matchCase ? input.value : input.value.toLowerCase();
+        const target = matchCase ? needle : needle.toLowerCase();
+        let index = backwards ? text.lastIndexOf(target, input.selectionStart - 1) : text.indexOf(target, input.selectionEnd);
+        if (index === -1) index = backwards ? text.lastIndexOf(target) : text.indexOf(target);  // Wrap around.
+        let total = 0;
+        for (let at = text.indexOf(target); at !== -1 && total < 10000; at = text.indexOf(target, at + target.length)) total += 1;
+        if (index === -1) {
+            counter.textContent = 'No matches';
+            return false;
+        }
+        counter.textContent = total + (total === 1 ? ' match' : ' matches');
+        select(index, index + needle.length);
+        findForm.elements.find.focus();
+        return true;
+    }
+
+    function selectionMatches() {
+        const needle = findForm.elements.find.value;
+        const chosen = input.value.slice(input.selectionStart, input.selectionEnd);
+        return needle && (findForm.elements.matchCase.checked ? chosen === needle : chosen.toLowerCase() === needle.toLowerCase());
+    }
+
+    function openFind(focusReplace = false) {
+        findForm.hidden = false;
+        const chosen = input.value.slice(input.selectionStart, input.selectionEnd);
+        if (chosen && !chosen.includes('\n')) findForm.elements.find.value = chosen;
+        const field = focusReplace ? findForm.elements.replace : findForm.elements.find;
+        field.focus();
+        field.select();
+    }
+
+    function closeFind() {
+        findForm.hidden = true;
+        $('#ed-matches').textContent = '';
+        input.focus();
+    }
+
+    function goToLine() {
+        const form = fileDialog('Go to line', '<label>Line number (1–' + lineCount + ')<input name="line" type="number" required min="1" max="' +
+            lineCount + '" value="' + Math.max(1, currentLine) + '"></label>', 'Go', fields => {
+            const target = Math.min(lineCount, Math.max(1, Math.round(Number(fields.line))));
+            let offset = 0;
+            for (let line = 1; line < target; line += 1) offset = input.value.indexOf('\n', offset) + 1;
+            select(offset, offset);
+        });
+        form.elements.line.select();
+    }
+
+    function showShortcuts() {
+        const shortcuts = [['Ctrl+S', 'Save changes'], ['Ctrl+F', 'Find'], ['Ctrl+H', 'Find and replace'],
+            ['Enter / Shift+Enter in Find', 'Next / previous match'], ['Ctrl+G', 'Go to line'], ['Ctrl+Z', 'Undo'],
+            ['Ctrl+Y or Ctrl+Shift+Z', 'Redo'], ['Alt+Z', 'Turn line wrapping on or off'], ['Tab', 'Insert a tab'],
+            ['Esc, then Tab', 'Move keyboard focus out of the editor'], ['Esc', 'Close Find']];
+        const dialog = document.createElement('dialog');
+        dialog.className = 'file-dialog';
+        dialog.setAttribute('aria-labelledby', 'ed-shortcuts-title');
+        dialog.innerHTML = '<form method="dialog"><h2 id="ed-shortcuts-title">Keyboard shortcuts</h2>' +
+            '<p class="muted">On macOS, use Cmd instead of Ctrl.</p>' +
+            table(['Keys', 'Action'], shortcuts.map(([keys, action]) => ['<kbd>' + esc(keys) + '</kbd>', esc(action)])) +
+            '<div class="actions"><button>Close</button></div></form>';
+        dialog.addEventListener('close', () => { dialog.remove(); input.focus(); }, {once: true});
+        $('#main').append(dialog);
+        dialog.showModal();
+    }
+
+    input.addEventListener('input', update);
+    for (const type of ['keyup', 'pointerup', 'select']) input.addEventListener(type, update);
+    input.addEventListener('scroll', syncScroll);
+    new ResizeObserver(() => { measuredFor = ''; update(); }).observe(input);
+    languageField.onchange = update;
+    fontField.onchange = () => { storePrefs(); applyView(); };
+    $('#ed-save').onclick = save;
+    $('#ed-close').onclick = closeEditor;
+    $('#ed-help').onclick = showShortcuts;
+    $('#ed-reopen').onclick = async () => {
+        if (dirty() && !await confirmed('Discard your changes and reload the file from the server?')) return;
+        try { await loadFile(); } catch (error) { setStatus(error.message); }
     };
-    update();
-    requestAnimationFrame(() => { if (input.isConnected) input.focus(); });
-    return () => input.value !== saved;
+    page.querySelector('.ed-tools').addEventListener('click', event => {
+        const button = event.target.closest('[data-ed]');
+        if (!button) return;
+        const action = button.dataset.ed;
+        if (action === 'find') findForm.hidden ? openFind() : closeFind();
+        else if (action === 'goto') goToLine();
+        else if (action === 'undo' || action === 'redo') { input.focus(); document.execCommand(action); update(); }
+        else if (action === 'wrap') { prefs.wrap = !prefs.wrap; storePrefs(); applyView(); }
+    });
+    findForm.onsubmit = event => { event.preventDefault(); findNext(); };
+    findForm.addEventListener('click', event => {
+        const action = event.target.closest('[data-find]')?.dataset.find;
+        if (action === 'previous') findNext(true);
+        else if (action === 'close') closeFind();
+        else if (action === 'replace' && editable) {
+            if (selectionMatches()) insertText(findForm.elements.replace.value);
+            findNext();
+        } else if (action === 'all' && editable) {
+            const needle = findForm.elements.find.value;
+            if (!needle) return;
+            const flags = findForm.elements.matchCase.checked ? 'g' : 'gi';
+            const pattern = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+            const count = (input.value.match(pattern) || []).length;
+            if (!count) { $('#ed-matches').textContent = 'No matches'; return; }
+            const replaced = input.value.replace(pattern, () => findForm.elements.replace.value);
+            input.focus();
+            input.setSelectionRange(0, input.value.length);
+            insertText(replaced);
+            input.setSelectionRange(0, 0);
+            $('#ed-matches').textContent = 'Replaced ' + count + (count === 1 ? ' match' : ' matches');
+        }
+    });
+    findForm.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); closeFind(); }
+        else if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); findNext(true); }
+    });
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { tabLeavesEditor = true; return; }
+        if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            if (tabLeavesEditor || event.shiftKey || !editable) { tabLeavesEditor = false; return; }
+            event.preventDefault();
+            insertText('\t');
+        }
+        tabLeavesEditor = false;
+    });
+    page.addEventListener('keydown', event => {
+        const key = event.key.toLowerCase();
+        const command = event.ctrlKey || event.metaKey;
+        if (command && key === 's') { event.preventDefault(); save(); }
+        else if (command && key === 'f') { event.preventDefault(); openFind(); }
+        else if (command && key === 'h') { event.preventDefault(); openFind(true); }
+        else if (command && key === 'g') { event.preventDefault(); goToLine(); }
+        else if (event.altKey && key === 'z') { event.preventDefault(); prefs.wrap = !prefs.wrap; storePrefs(); applyView(); }
+    });
+
+    applyView();
+    try {
+        await loadFile();
+    } catch (error) {
+        if (!active()) return;
+        setStatus(error.message);
+        input.value = '';
+        input.placeholder = error.message;
+        update();
+    }
 }
 
 const mediaFiles = {

@@ -117,7 +117,10 @@ secondary synchronization and DNSSEC remain separate work.
 
 ## Working with website files
 
-Select your hosting account and open **File Manager**. The screen has:
+Select your hosting account and open **File Manager**. It opens in its own browser
+tab, without the panel menus, and keeps one tab per hosting account. The tab's
+address records the current folder, so reloading it stays in that folder. The
+File Manager screen has:
 
 - a search bar: choose **All your files** or **Current folder**, enter part
   of a name after **for**, and press **Go**;
@@ -141,11 +144,22 @@ In the list, Ctrl+A selects all and Delete moves the selection to Trash.
 **Settings** controls **Show hidden files** and an owner and group column;
 the browser remembers these choices.
 
-- Choose **File** to open the source editor for a new file, or **Folder** to
-  create a directory. Select a text file and choose **Edit**. Select a highlighting
-  language and press **Save file** or use Ctrl+S (Cmd+S on macOS). A concurrent
-  saved change causes a revision conflict. Copy your unsaved text before
-  reopening the current file.
+- Choose **Folder** to create a directory. Choose **File**, then a name, to open
+  a new file in the editor tab; the file is created when you first save it.
+- Select a text file and choose **Edit**, or click its name, to open it in its
+  own editor tab. Each file has one editor tab.
+  - The top bar shows the file path and the encoding, UTF-8, the only encoding
+    the editor supports. **Re-open** reloads the saved copy, **Save Changes**
+    (Ctrl+S, Cmd+S on macOS) saves, and **Close** closes the tab.
+  - The tool bar has find and replace (Ctrl+F, Ctrl+H), go to line (Ctrl+G),
+    undo, redo, line wrapping (Alt+Z), font size and highlighting mode.
+    **Keyboard shortcuts** lists every shortcut.
+  - Tab inserts a tab character. To move keyboard focus out of the text,
+    press Esc, then Tab.
+  - The tab title starts with ● while changes are unsaved. Closing or leaving
+    the tab with unsaved changes asks first.
+  - If someone else saved the file after you opened it, saving reports a
+    revision conflict. Copy your text, then choose **Re-open**.
 - Drop files on the upload area or choose up to 50 at once. Watch progress
   per file. A file appears at its destination after the full upload succeeds.
   **Download** reconstructs the requested file from chunks of the same revision.
@@ -161,8 +175,9 @@ the browser remembers these choices.
   it to a new folder. **Compress** puts every selected file and folder into one
   ZIP. To compress a whole folder, select it in its parent folder, or open it and
   choose **Select All**.
-- **Delete** moves entries to Trash. Use **View Trash** to restore an entry to its
-  original or another unused path, or to delete one permanently. **Empty Trash**
+- **Delete** moves entries to Trash. **View Trash** shows Trash in the File Manager
+  tab. From there, restore an entry to its original or another unused path, or
+  delete one permanently. **Back to** returns to the folder. **Empty Trash**
   permanently deletes everything in Trash after a confirmation. Trash remains
   private to the hosting account.
 - Click PNG, JPEG, GIF or WebP to preview it. Use the width, height and output

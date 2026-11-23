@@ -528,3 +528,14 @@ remaining behavior and live acceptance before completion.
   panel under the account's Linux identity.
 - [ ] Add drag-and-drop moves between folders, a right-click menu and sorting
   across every page, which requires server-side sorting.
+
+## Alpha.13 File Manager and editor tabs
+
+- [x] Open File Manager in a full-page tab per hosting account, keeping the
+  folder in the tab address.
+- [x] Open each text file in a separate full-page editor tab with find and
+  replace, go to line, undo/redo, wrap, font size, highlighting mode and
+  shortcuts.
+- [x] Refresh File Manager after saves in editor tabs, and show Trash in the tab.
+- [ ] Support legacy encodings such as ISO-8859-1 and Windows-1252 in the editor.
+- [ ] Validate the tabs on the installed Amazon Linux panel and in Firefox and Safari.
