@@ -1,7 +1,7 @@
 # Reseller guide
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-An administrator creates your login and an account-count allowance. Your sidebar exposes hosting accounts, packages, domains, files, operations and preferences. System/audit/reseller administration is not granted.
+An administrator creates your login and an account-count allowance. Your sidebar holds Dashboard, Hosting Accounts, File Manager, Domains and Preferences. **Hosting Packages** is in the dashboard's **Hosting Management** group, and **Operation History** is in **Account**. The dashboard does not show Server Administration tools, and system, audit and reseller administration is not granted.
 
 Create your own packages or select global administrator packages. Packages enforce only domain counts. Create customers within your account allowance; pending and failed reservations count toward the allowance to prevent concurrent over-allocation. The initial customer password must be at least 14 characters. Provisioning is asynchronous: inspect Operation History before promising access.
 

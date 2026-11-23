@@ -3,6 +3,8 @@ Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
 Complete DEPLOYMENT.md first, using a disposable EC2 VM. Claim the initial administrator with the generated setup token. No default credentials exist.
 
+The sidebar holds Dashboard, Hosting Accounts, File Manager, Domains and Preferences. Open **Hosting Packages** from the dashboard's **Hosting Management** group. Server Information, Off-site Backups, Zone Editor, Resellers and Audit Log are in **Server Administration**, which only administrators see. Search the dashboard by tool or group name. The menu only hides tools; the server still checks the role and account ownership on every request.
+
 1. **Packages**: create a named package with a 1–100 domain limit. Only domain-count allocation is enforced; do not advertise disk, RAM, CPU or traffic quotas.
 2. **Hosting Accounts**: choose username, initial panel password and package. Account remains `provisioning` and login disabled until the Linux job succeeds. Review Operation History. Successful creation installs ap_USERNAME, a root-owned account boundary, writable public_html/runtime, read-only Nginx ACL and private PHP-FPM pool. Share credentials through your own secure channel.
 3. Select an account in the top account selector to manage its domains/files. No customer is selected by fabricated data. Accounts created by resellers are visible to administrators.

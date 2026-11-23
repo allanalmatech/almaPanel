@@ -21,7 +21,20 @@ Install Playwright and Chromium in a local development environment and run:
 ```bash
 python3 tests/e2e/browser.py
 ```
-Set CHROMIUM_PATH if Chromium is elsewhere. The runner starts a temporary HTTPS WSGI/SQLite app and exercises setup, login, package persistence, search, themes, mobile navigation and logout. No root adapters are simulated. In this workspace Chromium fails at startup because local socket creation is forbidden, so the browser suite is **not passed**. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
+Set CHROMIUM_PATH if Chromium is elsewhere (default `/usr/bin/chromium`), for example `CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome`. Set `ALMA_QA_DIR` to a folder to keep navigation screenshots. The runner starts a temporary HTTPS WSGI/SQLite app and exercises setup, login, package persistence, account retry, File Manager, backups, mail, DNS drafts, preferences, themes and logout.
+
+Since alpha.11 it also checks compact navigation:
+
+- Sidebar links: five for administrators and resellers, four for hosting users.
+- Dashboard groups for each role. Server Administration is hidden from resellers and users, and Hosting Management from users.
+- Opening secondary tools from dashboard groups.
+- Search by name, description and category, result counts, the empty state, Clear search and Escape.
+- Breadcrumbs, page titles, active and `aria-current` indicators.
+- Dashboard layout at 800, 1024, 1280, 1440 and 1920 pixels: small groups share rows, large groups span them, rows have no gaps and pages have no horizontal overflow.
+- Desktop collapse to an icon rail, persisted across a reload.
+- The mobile drawer at 390 pixels: focus moves into it, Tab stays inside, Escape returns focus to the menu button, and the backdrop, close button and link navigation close it.
+
+No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance
 On a **disposable clean Ubuntu 24.04 VM only**, after reviewing scripts:

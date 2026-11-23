@@ -238,3 +238,30 @@ Browser and Linux acceptance results cover the evaluation build locally.
 Installed Amazon Linux and Ubuntu acceptance, maximum-size browser download
 and additional browser engines are open. The production release gate remains
 closed.
+
+## 2026-11-23 · 0.1.0-alpha.11
+
+The owner asked for a short sidebar, with most tools on the dashboard. The
+previous workspace and its uncommitted navigation changes were not available,
+and GitHub had nothing newer than alpha.10. The navigation was rebuilt from the
+recorded requirements on top of commit `4110ffa`.
+
+The sidebar now has Dashboard, File Manager, Domains and Preferences, plus
+Hosting Accounts for administrators and resellers. One catalog in
+`frontend/app.js` drives the dashboard groups, search, breadcrumbs and role
+filtering. Server Administration is shown only to administrators, and Hosting
+Management to administrators and resellers. The server-side role and ownership
+checks are unchanged.
+
+Search matches tool names, descriptions and group names. It shows a result
+count, an empty state and a clear action. Small groups share rows on wide
+screens, and the last unpaired group stretches to fill its row. The desktop
+sidebar collapses to an icon rail and remembers the choice. On phones, the
+drawer moves focus inside, keeps Tab within it, and closes with Escape, the
+backdrop, the close button or a link. Signing out returns to the dashboard.
+
+- `make check` passed 80 tests, and the secret scan passed.
+- The Chromium suite passed with the new navigation checks for administrator,
+  reseller and hosting-user roles, five layout widths and a 390-pixel phone.
+- No API, agent or database changes. Installed Amazon Linux acceptance of
+  the new navigation is pending the owner's upgrade.

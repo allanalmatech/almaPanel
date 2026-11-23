@@ -51,8 +51,22 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button',name='Create administrator',exact=True).click()
             page.get_by_role('button',name='Sign in',exact=True).wait_for()
             page.get_by_role('button',name='Sign in',exact=True).click()
-            page.locator('#main h1').filter(has_text='Tools').wait_for()
-            page.get_by_role('link',name='Packages',exact=True).click()
+            page.locator('#main h1').filter(has_text='Dashboard').wait_for()
+
+            def open_tool(href):
+                # Secondary tools live in dashboard groups rather than the short sidebar.
+                page.locator('#nav a[href="#dashboard"]').click()
+                page.locator(f'.tool[href="#{href}"]').click()
+
+            def qa_shot(name):
+                if os.environ.get('ALMA_QA_DIR'):
+                    page.screenshot(path=str(Path(os.environ['ALMA_QA_DIR']) / f'{name}.png'))
+
+            def sidebar_links():
+                return page.locator('#nav a').evaluate_all('links => links.map(a => a.textContent.trim())')
+
+            assert sidebar_links() == ['Dashboard', 'Hosting Accounts', 'File Manager', 'Domains', 'Preferences']
+            open_tool('packages')
             page.locator('#package-form input[name=name]').fill('Browser package')
             page.locator('#package-form input[name=max_domains]').fill('3')
             page.get_by_role('button',name='Create package',exact=True).click()
@@ -87,7 +101,7 @@ with tempfile.TemporaryDirectory() as temp:
             with c.connect() as db:
                 queued = db.execute('SELECT payload FROM jobs WHERE account_id=? AND state=\'queued\'', (failed,)).fetchone()
                 assert json.loads(queued['payload']) == {'name': 'retryhost', 'retry': True}
-            page.locator('#nav a[href="#mail"]').click()
+            open_tool('mail')
             page.get_by_role('heading',name='Email Accounts').wait_for()
             page.get_by_text('Mail listeners accept only local connections.',exact=False).wait_for()
             page.locator('#mail-create [name=local]').fill('hello')
@@ -121,7 +135,7 @@ with tempfile.TemporaryDirectory() as temp:
 
             file_fixture = patch.object(c, 'rpc', side_effect=local_files)
             file_fixture.start()
-            page.locator('#nav a[href="#backups"]').click()
+            open_tool('backups')
             page.get_by_role('button',name='Create website backup').click()
             page.get_by_role('button',name='Browse files').click()
             page.get_by_role('cell',name='page.html').wait_for()
@@ -267,7 +281,7 @@ with tempfile.TemporaryDirectory() as temp:
                     route.fulfill(json=offsite_status)
 
             page.route('**/api/offsite-backups', browser_offsite)
-            page.locator('#nav a[href="#offsite-backups"]').click()
+            open_tool('offsite-backups')
             page.get_by_role('heading',name='Off-site backups',exact=True).wait_for()
             page.get_by_role('button',name='Run backup').click()
             page.get_by_text('Off-site backup requested.',exact=True).wait_for()
@@ -277,7 +291,7 @@ with tempfile.TemporaryDirectory() as temp:
                 json=[{'name': host, 'state': 'active'}]))
             page.route('**/api/accounts/*/dns?domain=*', lambda route: route.fulfill(
                 json={'available': True, 'active': True, 'nameservers': ['ns1.example.com'], 'records': []}))
-            page.locator('#nav a[href="#dns"]').click()
+            open_tool('dns')
             importer = page.locator('#zone-import')
             sample = {'format': 1, 'domain': 'another.example.com', 'serial': 1234,
                       'records': [{'name': '@', 'type': 'A', 'value': '192.0.2.10', 'ttl': 3600}]}
@@ -289,17 +303,95 @@ with tempfile.TemporaryDirectory() as temp:
                                       'buffer': json.dumps(sample).encode()})
             page.get_by_role('cell',name='192.0.2.10',exact=True).wait_for()
             page.get_by_text('Records loaded into the draft.',exact=False).wait_for()
+            # Compact navigation: dashboard groups, search, breadcrumbs, active state and layout.
             page.get_by_role('link',name='Dashboard',exact=True).click()
+            page.get_by_role('heading',name='Dashboard',exact=True).wait_for()
+            groups = page.locator('.tool-groups .section h2').evaluate_all(
+                'items => items.map(h => h.firstChild.textContent.trim())')
+            assert groups == ['Hosting Management', 'Files', 'Domains', 'Databases', 'Email', 'Software', 'Metrics',
+                              'Advanced', 'Security', 'Account', 'Help', 'Server Administration'], groups
+            total = page.locator('.tool').count()
+            assert page.locator('#tool-count').inner_text() == f'{total} tools in 12 groups'
             page.locator('#search').fill('file manager')
             page.locator('.tool[href="#files"]').wait_for()
             assert page.locator('.tool').count()==1
-            page.locator('#search').fill('')
+            assert page.locator('#tool-count').inner_text() == f'1 of {total} tools match “file manager”'
+            page.locator('#search').fill('advanced')  # category name only
+            assert sorted(page.locator('.tool').evaluate_all('a => a.map(x => x.hash)')) == ['#cron', '#dns-lookup']
+            page.locator('#search').fill('mariadb')  # description only
+            assert page.locator('.tool').evaluate_all('a => a.map(x => x.hash)') == ['#databases']
+            page.locator('#search').fill('no such hosting tool')
+            page.get_by_role('heading', name='No tools match “no such hosting tool”').wait_for()
+            page.get_by_role('button', name='Clear search', exact=True).click()
+            assert page.locator('.tool').count() == total
+            assert page.evaluate("document.activeElement.id") == 'search'
+            page.locator('#search').fill('trash')
+            page.keyboard.press('Escape')
+            assert page.locator('.tool').count() == total
+            page.locator('.tool[href="#availability"]').click()
+            page.get_by_role('heading', name='Feature availability', exact=True).wait_for()
+            crumbs = page.get_by_role('navigation', name='Breadcrumb')
+            assert crumbs.locator('li').all_inner_texts() == ['Home', 'Help', 'Feature Availability'], crumbs.inner_text()
+            assert page.title() == 'Feature Availability · almaPanel'
+            assert 'active' in page.locator('#nav a[href="#dashboard"]').get_attribute('class')
+            assert page.locator('#nav a[aria-current=page]').count() == 0
+            page.locator('#nav a[href="#files"]').click()
+            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            assert page.locator('#nav a[aria-current=page]').get_attribute('href') == '#files'
+            assert 'active' not in (page.locator('#nav a[href="#dashboard"]').get_attribute('class') or '')
+            page.locator('#nav a[href="#dashboard"]').click()
+
+            def layout_ok():
+                return page.evaluate('''() => {
+                    const grid = document.querySelector('.tool-groups').getBoundingClientRect();
+                    const rows = {};
+                    for (const s of document.querySelectorAll('.tool-groups .section')) {
+                        const r = s.getBoundingClientRect(), top = Math.round(r.top);
+                        (rows[top] ||= []).push({left: r.left, right: r.right, wide: s.classList.contains('wide')});
+                    }
+                    const list = Object.values(rows);
+                    return {overflow: document.documentElement.scrollWidth > innerWidth, rows: list.length,
+                            sections: list.flat().length, maxPerRow: Math.max(...list.map(r => r.length)),
+                            // Each row starts at the left edge and ends at the right edge: no empty columns.
+                            filled: list.every(r => Math.abs(Math.min(...r.map(x => x.left)) - grid.left) < 2
+                                                 && Math.abs(Math.max(...r.map(x => x.right)) - grid.right) < 2),
+                            wideAlone: list.every(r => !r.some(x => x.wide) || r.length === 1)};
+                }''')
+
+            for width in (1024, 1280, 1440, 1920):
+                page.set_viewport_size({'width': width, 'height': 1000})
+                result = layout_ok()
+                # Smaller categories sit side by side; large ones span the row; no row leaves a gap.
+                assert not result['overflow'] and result['filled'] and result['wideAlone'], (width, result)
+                assert result['maxPerRow'] == (3 if width >= 1700 else 2), (width, result)
+                assert result['rows'] < result['sections'], (width, result)
+            qa_shot('dashboard-1920')
+            page.set_viewport_size({'width': 800, 'height': 1000})
+            result = layout_ok()
+            assert not result['overflow'] and result['rows'] == result['sections'] and result['filled'], result
+            page.set_viewport_size({'width': 1440, 'height': 1000})
+
+            # Desktop collapse to an icon rail, persisted across reloads.
+            assert page.locator('#menu').get_attribute('aria-expanded') == 'true'
+            page.locator('#menu').click()
+            assert 'collapsed' in page.locator('body').get_attribute('class')
+            assert page.locator('#menu').get_attribute('aria-expanded') == 'false'
+            page.wait_for_function("() => document.getElementById('sidebar').getBoundingClientRect().width <= 70")
+            qa_shot('collapsed-1440')
+            page.reload()
+            page.get_by_role('heading', name='Dashboard', exact=True).wait_for()
+            assert 'collapsed' in page.locator('body').get_attribute('class')
+            page.get_by_role('link', name='File Manager', exact=True).click()
+            page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            page.get_by_role('button', name='Expand navigation').click()
+            assert 'collapsed' not in page.locator('body').get_attribute('class')
+            page.wait_for_function("() => document.getElementById('sidebar').getBoundingClientRect().width > 150")
             page.locator('#nav a[href="#preferences"]').click()
             page.get_by_role('heading',name='Two-factor authentication').wait_for()
             page.locator('#profile-form [name=display_name]').fill('Panel admin')
             page.get_by_role('button',name='Save contact information').click()
             page.get_by_text('Contact information saved.',exact=True).wait_for()
-            page.locator('#nav a[href="#tokens"]').click()
+            open_tool('tokens')
             page.get_by_role('heading',name='API Tokens').wait_for()
             page.locator('#token-form [name=label]').fill('Browser check')
             page.locator('#token-form [name=password]').fill(password)
@@ -313,15 +405,72 @@ with tempfile.TemporaryDirectory() as temp:
             assert 'dark' in page.locator('body').get_attribute('class')
             page.locator('#theme').click()
             if os.environ.get('ALMA_QA_SCREENSHOT'):page.screenshot(path=os.environ['ALMA_QA_SCREENSHOT'],full_page=True)
+            # Mobile drawer: open, focus, Escape, scrim, link navigation and secondary tools from dashboard.
             page.set_viewport_size({'width':390,'height':844})
+            assert not page.locator('#sidebar').is_visible()
+            page.locator('#menu[aria-label="Open navigation"][aria-expanded=false]').wait_for()
             page.locator('#menu').click()
-            page.locator('#nav a[href="#about"]').click()
+            page.locator('#sidebar').wait_for(state='visible')
+            assert page.locator('#menu').get_attribute('aria-expanded') == 'true'
+            assert page.evaluate("document.activeElement.getAttribute('href')") == '#dashboard'
+            qa_shot('mobile-drawer')
+            page.keyboard.press('Shift+Tab')  # focus stays inside the open drawer
+            assert page.evaluate("document.getElementById('sidebar').contains(document.activeElement)")
+            page.keyboard.press('Escape')
+            page.locator('#sidebar').wait_for(state='hidden')
+            assert page.evaluate("document.activeElement.id") == 'menu'
+            page.locator('#menu').click()
+            page.mouse.click(380, 400)  # scrim outside the drawer
+            page.locator('#sidebar').wait_for(state='hidden')
+            page.locator('#menu').click()
+            page.locator('#sidebar').get_by_role('button', name='Close navigation').click()
+            page.locator('#sidebar').wait_for(state='hidden')
+            page.locator('#menu').click()
+            page.locator('#nav a[href="#preferences"]').click()
+            page.get_by_role('heading',name='Two-factor authentication').wait_for()
+            page.locator('#sidebar').wait_for(state='hidden')
+            page.locator('#menu').click()
+            page.locator('#nav a[href="#dashboard"]').click()
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            page.locator('.tool[href="#about"]').click()
             page.get_by_role('heading',name='About almaPanel').wait_for()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            page.set_viewport_size({'width':1440,'height':1000})
             page.locator('#logout').click()
             page.get_by_role('heading',name='Sign in to your account').wait_for()
+
+            # Role-based sidebar and dashboard groups for resellers and hosting users.
+            with c.connect() as db:
+                for name, role in (('browserseller', 'reseller'), ('browseruser', 'user')):
+                    db.execute("INSERT INTO users(username,password,role,owner_id,enabled,created) VALUES(?,?,?,?,1,0)",
+                               (name, c.password_hash(password), role, actor))
+            expected = {
+                'browserseller': (['Dashboard', 'Hosting Accounts', 'File Manager', 'Domains', 'Preferences'], True),
+                'browseruser': (['Dashboard', 'File Manager', 'Domains', 'Preferences'], False),
+            }
+            for name, (links, manages) in expected.items():
+                page.locator('#login-form input[name=username]').fill(name)
+                page.locator('#login-form input[name=password]').fill(password)
+                page.get_by_role('button',name='Sign in',exact=True).click()
+                page.get_by_role('heading', name='Dashboard', exact=True).wait_for()
+                assert sidebar_links() == links, (name, sidebar_links())
+                result = layout_ok()
+                assert not result['overflow'] and result['filled'] and result['wideAlone'], (name, result)
+                qa_shot(f'dashboard-{name}')
+                headings = page.locator('.tool-groups .section h2').all_inner_texts()
+                assert any(h.startswith('HOSTING MANAGEMENT') for h in headings) == manages, (name, headings)
+                assert not any(h.startswith('SERVER ADMINISTRATION') for h in headings), (name, headings)
+                for admin_only in ('system', 'audit', 'resellers', 'dns', 'offsite-backups'):
+                    assert page.locator(f'.tool[href="#{admin_only}"]').count() == 0
+                page.locator('#search').fill('resellers')
+                page.get_by_role('heading', name='No tools match “resellers”').wait_for()
+                page.locator('#search').fill('')
+                page.locator('#logout').click()
+                page.get_by_role('heading',name='Sign in to your account').wait_for()
             assert not errors, errors
             browser.close()
-            print('Browser acceptance passed for account setup and retry, file uploads/downloads, editing, ZIP, images, Trash, mobile navigation, mail, backups, DNS and preferences.')
+            print('Browser acceptance passed for compact role-based navigation, dashboard search and layout, desktop collapse, '
+                  'mobile drawer focus handling, account setup and retry, file uploads/downloads, editing, ZIP, images, '
+                  'Trash, mail, backups, DNS and preferences.')
     finally:
         server.shutdown();thread.join();os.environ.pop('ALMA_ORIGIN',None)

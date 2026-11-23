@@ -241,12 +241,12 @@ This section reconciles the user’s alpha.2 checklist. Items remain open until 
 
 ### Dashboard and navigation
 
-- [ ] Full grouped catalog and sidebar
-- [ ] notifications
+- [x] Full grouped catalog and sidebar: short role-based sidebar, searchable dashboard groups (alpha.11)
+- [~] notifications: account-scoped job inbox exists; delivery channels open
 - [ ] language selector
 - [ ] profile controls
 - [ ] contextual help
-- [ ] keyboard/mobile acceptance
+- [~] keyboard/mobile acceptance: Chromium drawer, focus and collapse checks pass; screen-reader and other-browser acceptance open
 - [ ] primary domain and shared IP
 - [ ] quota bars
 - [ ] bandwidth and resource counts
@@ -502,3 +502,15 @@ remaining behavior and live acceptance before completion.
   in BIND. Zone Editor verifies the export's domain before loading a draft.
 - [ ] Run the live Amazon Linux backup and republish checks.
 - [ ] Cover external DNS integrations and full-account recovery.
+
+## Alpha.11 compact navigation implementation and acceptance
+
+- [x] Shorten the sidebar to Dashboard, Hosting Accounts (administrators and
+  resellers), File Manager, Domains and Preferences.
+- [x] Move every other tool into searchable, role-filtered dashboard groups
+  from one shared catalog. Add breadcrumbs, desktop collapse and a mobile drawer.
+- [x] Pass Chromium checks for all three roles, search, layout widths,
+  collapse persistence and mobile focus handling.
+- [~] Validate the navigation on the installed Amazon Linux panel after the
+  alpha.11 upgrade.
+- [ ] Run screen-reader, Firefox and Safari acceptance.

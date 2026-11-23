@@ -80,6 +80,21 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.11
+
+- Shorten the sidebar to Dashboard, Hosting Accounts (administrators and resellers),
+  File Manager, Domains and Preferences. Every other tool opens from a dashboard group.
+- Add a shared, role-filtered tool catalog for the dashboard, search and breadcrumbs.
+- Search matches tool names, descriptions and category names, shows a result count,
+  and has an empty state and a clear action.
+- Place smaller dashboard groups side by side on wider screens without leaving gaps.
+- Add original sidebar icons, active and current-page indicators, readable breadcrumbs
+  and page titles.
+- Collapse the desktop sidebar to an icon rail and remember the choice per browser.
+- Add a mobile navigation drawer with a close button, backdrop, Escape key and focus handling.
+- Return to the dashboard after sign-out so the next user does not open the previous user's tool.
+- Extend Chromium acceptance to administrator, reseller and hosting-user navigation.
+
 ## 0.1.0-alpha.10
 
 - Add a nested, paged folder browser, ownership and real account storage usage.
