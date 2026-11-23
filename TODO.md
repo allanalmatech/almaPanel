@@ -526,8 +526,9 @@ remaining behavior and live acceptance before completion.
 - [x] Empty Trash and Back/Forward history.
 - [ ] Run the multi-entry ZIP and bulk operations on the installed Amazon Linux
   panel under the account's Linux identity.
-- [ ] Add drag-and-drop moves between folders, a right-click menu and sorting
-  across every page, which requires server-side sorting.
+- [x] Right-click actions menu (alpha.14).
+- [ ] Add drag-and-drop moves between folders and sorting across every page,
+  which requires server-side sorting.
 
 ## Alpha.13 File Manager and editor tabs
 
@@ -539,3 +540,10 @@ remaining behavior and live acceptance before completion.
 - [x] Refresh File Manager after saves in editor tabs, and show Trash in the tab.
 - [ ] Support legacy encodings such as ISO-8859-1 and Windows-1252 in the editor.
 - [ ] Validate the tabs on the installed Amazon Linux panel and in Firefox and Safari.
+
+## Alpha.14 File Manager mouse and keyboard actions
+
+- [x] Right-click actions menu with keyboard support and selection-aware items.
+- [x] Double-click downloads files and opens folders.
+- [x] Second-click inline rename, plus F2, toolbar and menu rename.
+- [ ] Touch long-press for the actions menu on phones and tablets.

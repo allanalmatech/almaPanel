@@ -308,3 +308,19 @@ Media and ZIP previews stay inline. No API or agent changes.
 - The Chromium suite passed with real pop-up tabs for File Manager and the
   editor, including the cross-tab refresh, unsaved-change prompts and
   wrapped-line numbering.
+
+## 2026-11-23 · 0.1.0-alpha.14
+
+The owner asked for familiar mouse behavior in File Manager. Right-clicking an
+entry opens an actions menu in the requested order, which uses the toolbar's
+commands and enable rules. Right-clicking outside the current selection
+selects that entry first. Double-clicking downloads a file or opens a folder.
+A second click on a selected entry's name renames it in place after a short
+delay. A double-click cancels that pending rename, so it does not start
+renaming. The old rename dialog was replaced by inline renaming. Text files
+now open from Edit, View or the menu rather than a single click on the name.
+No API or agent changes.
+
+- `make check` passed 81 tests.
+- The Chromium suite passed the new menu, double-click and rename
+  checks, along with all earlier workflows.

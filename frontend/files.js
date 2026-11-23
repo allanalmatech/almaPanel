@@ -358,7 +358,21 @@ async function fileManagerView(epoch) {
         '<div class="fm-status"><p id="file-page-status" role="status"></p><div class="toolbar" id="file-pages"></div></div>' +
         '<section id="file-open" class="file-open" hidden><div class="file-open-head"><h2 id="file-open-title"></h2>' +
         '<button id="close-file" class="subtle">Close file</button></div><div id="file-preview-content"></div></section>' +
-        '</section></div></div>';
+        '</section></div>' +
+        '<div class="fm-menu" id="fm-menu" role="menu" hidden>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="open">' + fmIcon('folder') + '<span>Open</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="download">' + fmIcon('download') + '<span>Download</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="view">' + fmIcon('view') + '<span>View</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="edit">' + fmIcon('edit') + '<span>Edit</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="move">' + fmIcon('move') + '<span>Move</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="copy">' + fmIcon('copy') + '<span>Copy</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="rename">' + fmIcon('rename') + '<span>Rename</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="permissions">' + fmIcon('permissions') + '<span>Change Permissions</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="delete">' + fmIcon('delete') + '<span>Delete</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="compress">' + fmIcon('compress') + '<span>Compress</span></button>' +
+        '<button type="button" role="menuitem" tabindex="-1" data-cmd="extract">' + fmIcon('extract') + '<span>Extract</span></button>' +
+        '</div>' +
+        '</div>';
     const folderForm = $('#file-location');
     const listing = $('#file-list');
     const pages = $('#file-pages');
@@ -416,7 +430,7 @@ async function fileManagerView(epoch) {
         const state = {
             copy: real, move: items.length > 0, delete: items.length > 0, compress: real,
             download: Boolean(one?.regular), rename: Boolean(one), edit: Boolean(one && isEditable(one)),
-            view: Boolean(one?.regular), permissions: real, extract: Boolean(one && isZip(one)),
+            view: Boolean(one?.regular), permissions: real, extract: Boolean(one && isZip(one)), open: Boolean(one?.directory),
             up: current !== '', back: past.length > 0, forward: ahead.length > 0,
             selectall: rows.length > 0 && items.length < rows.length, selectnone: items.length > 0
         };
@@ -470,8 +484,8 @@ async function fileManagerView(epoch) {
         const body = rows.length ? rows.map((entry, index) => {
             const kind = entry.directory ? 'dir' : entry.symlink ? 'link' : 'doc';
             const name = entry.regular || entry.directory
-                ? '<button type="button" class="fm-open" data-open="' + index + '">' + esc(entry.name) + '</button>'
-                : '<span>' + esc(entry.name) + '</span>';
+                ? '<span class="fm-name-text">' + esc(entry.name) + '</span>'
+                : '<span class="fm-name-text fm-special">' + esc(entry.name) + '</span>';
             const owner = esc(entry.owner) + ' / ' + esc(entry.group);
             return '<tr data-index="' + index + '" aria-selected="false"><td class="fm-check"><input type="checkbox" aria-label="Select ' +
                 esc(entry.name) + '"></td><td class="fm-name"><span class="fm-kind fm-' + kind + '">' + fmIcon(kind) + '</span>' + name + '</td>' +
@@ -491,7 +505,21 @@ async function fileManagerView(epoch) {
         updateTools();
     }
 
+    // Mouse: click selects, a second click on a selected name renames, double-click downloads
+    // files or opens folders, right-click opens the actions menu. Keyboard: Enter opens or
+    // downloads, F2 renames, Shift+F10 or the Menu key opens the actions menu.
+    let renameTimer = null;
+    let renaming = null;
+    const cancelPendingRename = () => { clearTimeout(renameTimer); renameTimer = null; };
+
+    function activate(entry) {
+        if (entry.directory) return openFolder(locationOf(entry));
+        if (entry.regular) return download(entry);
+        return Promise.resolve();
+    }
+
     listing.addEventListener('click', event => {
+        if (event.target.closest('.fm-rename')) return;
         const sort = event.target.closest('[data-sort]');
         if (sort) {
             sortAscending = sort.dataset.sort === sortKey ? !sortAscending : true;
@@ -505,16 +533,13 @@ async function fileManagerView(epoch) {
             updateTools();
             return;
         }
-        const open = event.target.closest('[data-open]');
-        if (open) {
-            const entry = rows[Number(open.dataset.open)];
-            (entry.directory ? openFolder(locationOf(entry)) : openFile(locationOf(entry), entry.size)).catch(error => notice(error.message));
-            return;
-        }
         const row = event.target.closest('tr[data-index]');
         if (!row) return;
         const index = Number(row.dataset.index);
-        const name = rows[index].name;
+        const entry = rows[index];
+        const name = entry.name;
+        const onlyThis = chosen.size === 1 && chosen.has(name);
+        cancelPendingRename();
         if (event.target.matches('input[type=checkbox]')) {
             if (event.target.checked) chosen.add(name); else chosen.delete(name);
             anchor = index;
@@ -526,6 +551,10 @@ async function fileManagerView(epoch) {
             if (chosen.has(name)) chosen.delete(name); else chosen.add(name);
             anchor = index;
         } else {
+            // A second, separate click on the name of the only selected item starts renaming.
+            if (onlyThis && event.detail === 1 && event.target.closest('.fm-name-text') && (entry.regular || entry.directory)) {
+                renameTimer = setTimeout(() => { renameTimer = null; startRename(entry); }, 550);
+            }
             chosen.clear();
             chosen.add(name);
             anchor = index;
@@ -533,23 +562,147 @@ async function fileManagerView(epoch) {
         updateTools();
     });
     listing.addEventListener('dblclick', event => {
+        cancelPendingRename();
         const row = event.target.closest('tr[data-index]');
         if (!row || event.target.closest('button, input')) return;
         const entry = rows[Number(row.dataset.index)];
-        if (entry.directory) openFolder(locationOf(entry)).catch(error => notice(error.message));
-        else if (entry.regular) openFile(locationOf(entry), entry.size).catch(error => notice(error.message));
+        chosen.clear();
+        chosen.add(entry.name);
+        updateTools();
+        activate(entry).catch(error => notice(error.message));
+    });
+    listing.addEventListener('contextmenu', event => {
+        const row = event.target.closest('tr[data-index]');
+        if (!row || event.target.closest('.fm-rename')) return;
+        event.preventDefault();
+        cancelPendingRename();
+        const index = Number(row.dataset.index);
+        // Right-clicking outside the selection selects just that item.
+        if (!chosen.has(rows[index].name)) {
+            chosen.clear();
+            chosen.add(rows[index].name);
+            anchor = index;
+            updateTools();
+        }
+        openMenu(event.clientX, event.clientY, row);
     });
     listing.addEventListener('keydown', event => {
         if (event.target.closest('input:not([type=checkbox]), textarea')) return;
+        const row = event.target.closest('tr[data-index]');
+        const entry = row && rows[Number(row.dataset.index)];
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
             event.preventDefault();
-            rows.forEach(entry => chosen.add(entry.name));
+            rows.forEach(item => chosen.add(item.name));
             updateTools();
         } else if (event.key === 'Delete' && chosen.size) {
             event.preventDefault();
             command('delete');
+        } else if (entry && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
+            event.preventDefault();
+            if (!chosen.has(entry.name)) { chosen.clear(); chosen.add(entry.name); updateTools(); }
+            const box = row.getBoundingClientRect();
+            openMenu(box.left + 40, box.bottom, row);
+        } else if (entry && event.key === 'F2') {
+            event.preventDefault();
+            startRename(entry);
+        } else if (entry && event.key === 'Enter') {
+            event.preventDefault();
+            activate(entry).catch(error => notice(error.message));
         }
     });
+
+    // Rename in place: Enter or leaving the field saves, Esc cancels.
+    function startRename(entry) {
+        if (!active() || mode !== 'files' || renaming) return;
+        const index = rows.indexOf(entry);
+        const label = listing.querySelector('tr[data-index="' + index + '"] .fm-name-text');
+        if (!label) return;
+        renaming = entry;
+        const field = document.createElement('input');
+        field.className = 'fm-rename';
+        field.value = entry.name;
+        field.maxLength = 255;
+        field.setAttribute('aria-label', 'New name for ' + entry.name);
+        label.replaceWith(field);
+        field.focus();
+        const dot = entry.directory ? -1 : entry.name.lastIndexOf('.');
+        field.setSelectionRange(0, dot > 0 ? dot : entry.name.length);
+        let finished = false;
+        const finish = async save => {
+            if (finished) return;
+            finished = true;
+            const next = field.value.trim();
+            const location = locationOf(entry);
+            try {
+                if (save && next !== entry.name) {
+                    await filePath(path, 'rename', {path: location, destination: joinFilePath(current, validateFileName(next))});
+                    notice('Renamed ' + entry.name + ' to ' + next + '.');
+                    if (location === selected) closePreview();
+                    chosen.clear();
+                    chosen.add(next);
+                }
+            } catch (error) {
+                notice(error.message);
+            } finally {
+                renaming = null;
+                if (active()) await refresh();
+                listing.querySelector('tr.chosen input[type=checkbox]')?.focus();
+            }
+        };
+        field.addEventListener('keydown', event => {
+            event.stopPropagation();
+            if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+            else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+        });
+        field.addEventListener('blur', () => finish(true));
+        field.addEventListener('dblclick', event => event.stopPropagation());
+    }
+
+    // Right-click actions menu. Items share the toolbar's command handlers and enable rules.
+    const menu = $('#fm-menu');
+    let menuReturn = null;
+    let menuOpenedAt = 0;
+    function menuItems() { return [...menu.querySelectorAll('[role=menuitem]')].filter(item => !item.hidden && !item.disabled); }
+    function closeMenu(restoreFocus = false) {
+        if (menu.hidden) return;
+        menu.hidden = true;
+        if (restoreFocus) menuReturn?.focus();
+    }
+    function openMenu(x, y, row) {
+        const items = selection();
+        const one = items.length === 1 ? items[0] : null;
+        menu.querySelector('[data-cmd=open]').hidden = !one?.directory;
+        menu.querySelector('[data-cmd=extract]').hidden = !(one && isZip(one));
+        menu.setAttribute('aria-label', 'Actions for ' + (one ? one.name : items.length + ' items'));
+        menuReturn = row.querySelector('input[type=checkbox]');
+        menuOpenedAt = performance.now();
+        menu.hidden = false;
+        const box = menu.getBoundingClientRect();
+        menu.style.left = Math.max(4, Math.min(x, innerWidth - box.width - 4)) + 'px';
+        menu.style.top = Math.max(4, Math.min(y, innerHeight - box.height - 4)) + 'px';
+        menuItems()[0]?.focus();
+    }
+    menu.addEventListener('keydown', event => {
+        const items = menuItems();
+        const at = items.indexOf(document.activeElement);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            items[(at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+        } else if (event.key === 'Home' || event.key === 'End') {
+            event.preventDefault();
+            items[event.key === 'Home' ? 0 : items.length - 1]?.focus();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMenu(true);
+        } else if (event.key === 'Tab') {
+            closeMenu(true);
+        }
+    });
+    document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) closeMenu(); }, {signal: controller.signal});
+    window.addEventListener('resize', () => closeMenu(), {signal: controller.signal});
+    // Scrolling anything closes the menu, except the scroll that brought the row into view as it opened.
+    document.addEventListener('scroll', () => { if (performance.now() - menuOpenedAt > 200) closeMenu(); },
+        {capture: true, signal: controller.signal});
 
     async function load(folder, nextOffset = 0) {
         const request = ++browseRequest;
@@ -739,15 +892,6 @@ async function fileManagerView(epoch) {
         }
     }
 
-    function renameDialog(entry) {
-        const location = locationOf(entry);
-        fileDialog('Rename ' + entry.name, '<label>New name<input name="filename" required maxlength="255" value="' +
-            esc(entry.name) + '"></label>', 'Rename', async fields => {
-            await runFileAction('rename', {path: location, destination: joinFilePath(current, validateFileName(fields.filename))});
-            if (location === selected) closePreview();
-        });
-    }
-
     function settingsDialog() {
         const form = fileDialog('File Manager settings',
             '<label class="file-check"><input type="checkbox" name="hidden"' + (showHidden ? ' checked' : '') + '> Show hidden files</label>' +
@@ -819,8 +963,9 @@ async function fileManagerView(epoch) {
             }
             await runEach(items, 'Moved to Trash', entry => filePath(path, 'trash', {path: locationOf(entry)}));
         } else if (cmd === 'rename') {
-            if (locationOf(one) === selected && !await checkChanges()) return;
-            renameDialog(one);
+            startRename(one);
+        } else if (cmd === 'open') {
+            await openFolder(locationOf(one));
         } else if (cmd === 'edit' || cmd === 'view') {
             await openFile(locationOf(one), one.size);
         } else if (cmd === 'permissions') {
@@ -864,6 +1009,7 @@ async function fileManagerView(epoch) {
         const button = event.target.closest('button[data-cmd]');
         if (!button || button.disabled) return;
         event.preventDefault();
+        if (menu.contains(button)) closeMenu(true);
         button.disabled = true;
         try { await command(button.dataset.cmd); }
         catch (error) { notice(error.message); }

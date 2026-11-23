@@ -59,6 +59,15 @@ Since alpha.13 the suite also checks:
   - creating a new file on the first save
   - wrapped-line numbering.
 
+Since alpha.14 the suite also checks:
+
+- Double-click download without starting a rename.
+- The file and folder right-click menus: item order, enabled states,
+  keyboard focus, Esc, outside clicks and running Download, Rename, View
+  and Open from them.
+- Second-click rename, including the delay, the selected base name and Esc.
+- F2 rename, and rename saved by Enter or by leaving the field.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

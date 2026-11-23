@@ -135,8 +135,6 @@ a.fm-btn{color:var(--blue)}
 .fm-kind{display:inline-flex;color:var(--muted)}
 .fm-kind.fm-dir{color:#d39a1f}
 .fm-kind .fm-icon{width:18px;height:18px}
-.fm-open{background:transparent;color:var(--ink);padding:0;text-align:left;white-space:normal;overflow-wrap:anywhere}
-.fm-open:hover{color:var(--blue);text-decoration:underline;filter:none}
 .fm-col-size,.fm-col-permissions{font-variant-numeric:tabular-nums}
 .fm-empty{text-align:center;color:var(--muted);padding:30px!important}
 .fm-status{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
@@ -216,3 +214,17 @@ a.fm-btn{color:var(--blue)}
     font-family:ui-monospace,"Liberation Mono",Consolas,monospace;line-height:1.55;tab-size:4;font-variant-ligatures:none}
 kbd{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
 @media(max-width:700px){.ed-field input{width:46vw}.ed-cursor{display:none}.ed-link{margin-right:0}}
+
+/* File Manager row names, inline rename and the right-click actions menu. */
+.fm-name-text{white-space:normal;overflow-wrap:anywhere;cursor:default}
+.fm-name-text.fm-special{color:var(--muted)}
+.fm-rename{width:auto;min-width:180px;flex:1;padding:3px 6px;font-size:13px;border-color:var(--blue)}
+.fm-menu{position:fixed;z-index:40;min-width:210px;padding:5px 0;background:var(--surface);border:1px solid var(--line);
+    border-radius:6px;box-shadow:0 8px 28px #0b1a2833;display:flex;flex-direction:column}
+.fm-menu[hidden]{display:none}
+.fm-menu button{display:flex;align-items:center;gap:10px;width:100%;background:transparent;color:var(--ink);border:0;border-radius:0;
+    padding:7px 16px;font-size:14px;text-align:left}
+.fm-menu button:hover:not(:disabled),.fm-menu button:focus-visible{background:var(--pale);outline:none;filter:none}
+.fm-menu button:disabled{opacity:.4;cursor:default}
+.fm-menu button[hidden]{display:none}
+.fm-menu .fm-icon{width:16px;height:16px}

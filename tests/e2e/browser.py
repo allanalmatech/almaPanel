@@ -175,7 +175,11 @@ with tempfile.TemporaryDirectory() as temp:
                 return actions.get_by_role('button', name=name, exact=True).is_enabled()
 
             def row(name):
-                return page.locator('#file-list tbody tr').filter(has=page.get_by_role('button', name=name, exact=True))
+                return page.locator('#file-list tbody tr').filter(
+                    has=page.locator('.fm-name-text').get_by_text(name, exact=True))
+
+            def menu_item(name):
+                return page.get_by_role('menu').get_by_role('menuitem', name=name, exact=True)
 
             def select_only(name, **click):
                 # A plain click on a row selects only that item; Ctrl adds to the selection.
@@ -189,11 +193,11 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Settings', exact=True).click()
             settings_dialog.get_by_role('checkbox', name='Show hidden files').check()
             settings_dialog.get_by_role('button', name='Save settings').click()
-            page.get_by_role('button', name='.settings', exact=True).wait_for()
+            row('.settings').wait_for()
             page.get_by_role('button', name='Settings', exact=True).click()
             settings_dialog.get_by_role('checkbox', name='Show hidden files').uncheck()
             settings_dialog.get_by_role('button', name='Save settings').click()
-            page.get_by_role('button', name='.settings', exact=True).wait_for(state='hidden')
+            row('.settings').wait_for(state='hidden')
             tree = page.get_by_role('navigation', name='Folder tree')
             tree.get_by_role('button', name='Expand assets', exact=True).click()
             tree.get_by_role('button', name='icons', exact=True).click()
@@ -216,6 +220,38 @@ with tempfile.TemporaryDirectory() as temp:
             with page.expect_download() as download:
                 act('Download')
             assert download.value.path().read_bytes() == big_file
+            # Double-clicking a file downloads it and does not start renaming.
+            with page.expect_download() as download:
+                row('file.php').get_by_text('file.php', exact=True).dblclick()
+            assert download.value.path().read_bytes() == php
+            page.wait_for_timeout(800)
+            assert page.locator('.fm-rename').count() == 0
+            assert page.locator('#file-list tr.chosen').count() == 1
+
+            # Right-click opens the actions menu for that item.
+            row('large.bin').click(button='right')
+            menu = page.get_by_role('menu', name='Actions for large.bin')
+            menu.wait_for()
+            qa_shot('context-menu')
+            labels = menu.get_by_role('menuitem').evaluate_all('items => items.filter(i => !i.hidden).map(i => i.textContent)')
+            assert labels == ['Download', 'View', 'Edit', 'Move', 'Copy', 'Rename', 'Change Permissions', 'Delete', 'Compress'], labels
+            assert menu_item('Download').is_enabled() and not menu_item('Edit').is_enabled()
+            assert page.evaluate("document.activeElement.textContent") == 'Download'
+            page.keyboard.press('ArrowDown')
+            assert page.evaluate("document.activeElement.textContent") == 'View'
+            page.keyboard.press('Escape')
+            menu.wait_for(state='hidden')
+            assert page.locator('#file-list tr.chosen').count() == 1 and 'chosen' in row('large.bin').get_attribute('class')
+            row('large.bin').click(button='right')
+            with page.expect_download() as download:
+                menu_item('Download').click()
+            assert download.value.path().read_bytes() == big_file
+            menu.wait_for(state='hidden')
+            # Clicking elsewhere closes the menu.
+            row('file.php').click(button='right')
+            page.get_by_role('menu', name='Actions for file.php').wait_for()
+            page.locator('.fm-status').click()
+            page.get_by_role('menu').wait_for(state='hidden')
             dropped = page.evaluate_handle('''() => {
                 const transfer = new DataTransfer();
                 transfer.items.add(new File(['dropped'], 'drop.txt', {type: 'text/plain'}));
@@ -356,26 +392,61 @@ with tempfile.TemporaryDirectory() as temp:
             dialog.get_by_role('button', name='Move', exact=True).click()
             dialog.wait_for(state='hidden')
             assert (website / 'moved.php').is_file() and not (folder / 'copied.php').exists()
-            select_only('drop.txt')
-            act('Rename')
-            dialog = page.get_by_role('dialog', name='Rename drop.txt')
-            dialog.get_by_role('textbox', name='New name').fill('dropped.txt')
-            dialog.get_by_role('button', name='Rename', exact=True).click()
-            dialog.wait_for(state='hidden')
+            # A second click on the selected item's name renames it in place.
+            row('drop.txt').get_by_text('drop.txt', exact=True).click()
+            page.wait_for_timeout(700)
+            assert page.locator('.fm-rename').count() == 0
+            row('drop.txt').get_by_text('drop.txt', exact=True).click()
+            rename = page.get_by_role('textbox', name='New name for drop.txt')
+            rename.wait_for()
+            qa_shot('inline-rename')
+            assert page.evaluate("[document.activeElement.selectionStart, document.activeElement.selectionEnd]") == [0, 4]
+            rename.press('Escape')
+            rename.wait_for(state='hidden')
+            assert (folder / 'drop.txt').exists()
+            page.keyboard.press('F2')
+            rename = page.get_by_role('textbox', name='New name for drop.txt')
+            rename.fill('dropped.txt')
+            rename.press('Enter')
+            row('dropped.txt').wait_for()
             assert (folder / 'dropped.txt').read_text() == 'dropped' and not (folder / 'drop.txt').exists()
+            assert 'chosen' in row('dropped.txt').get_attribute('class')
+            # Rename from the right-click menu.
+            row('dropped.txt').click(button='right')
+            menu_item('Rename').click()
+            rename = page.get_by_role('textbox', name='New name for dropped.txt')
+            rename.fill('drop2.txt')
+            rename.press('Enter')
+            row('drop2.txt').wait_for()
+            row('drop2.txt').click(button='right')
+            menu_item('Rename').click()
+            rename = page.get_by_role('textbox', name='New name for drop2.txt')
+            rename.fill('dropped.txt')
+            page.locator('.fm-status').click()  # Leaving the field saves.
+            row('dropped.txt').wait_for()
+            assert (folder / 'dropped.txt').read_text() == 'dropped'
 
             select_only('file.php')
             act('Compress')
             page.get_by_role('dialog', name='Compress file.php').get_by_role('button', name='Create ZIP', exact=True).click()
-            page.get_by_role('button', name='file.php.zip', exact=True).click()
-            page.get_by_text('1 file in this ZIP', exact=True).wait_for()
             select_only('file.php.zip')
+            act('View')
+            page.get_by_text('1 file in this ZIP', exact=True).wait_for()
             act('Extract')
             dialog = page.get_by_role('dialog', name='Extract file.php.zip')
             dialog.get_by_role('textbox', name='Name', exact=True).fill('unpacked')
             dialog.get_by_role('button', name='Extract', exact=True).click()
             dialog.wait_for(state='hidden')
             assert (folder / 'unpacked' / 'file.php').read_bytes() == (folder / 'file.php').read_bytes()
+            # Folders offer Open in the right-click menu.
+            row('unpacked').click(button='right')
+            folder_menu = page.get_by_role('menu', name='Actions for unpacked')
+            assert folder_menu.get_by_role('menuitem').evaluate_all('items => items.filter(i => !i.hidden).map(i => i.textContent)')[0] == 'Open'
+            assert not menu_item('Download').is_enabled() and menu_item('Compress').is_enabled()
+            menu_item('Open').click()
+            crumbs_now.get_by_text('unpacked', exact=True).wait_for()
+            folder_nav.get_by_role('button', name='Up One Level').click()
+            crumbs_now.get_by_text('icons', exact=True).wait_for()
 
             # Several items: Ctrl-click, then compress them into one ZIP.
             select_only('created.txt')
@@ -416,7 +487,8 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('Image saved.', exact=True).wait_for()
             assert (folder / 'photo-resized.webp').read_bytes()[8:12] == b'WEBP'
             assert (folder / 'photo.png').read_bytes() == picture
-            page.get_by_role('button', name='tone.wav', exact=True).click()
+            row('tone.wav').click(button='right')
+            menu_item('View').click()
             page.wait_for_function("() => document.querySelector('audio')?.readyState >= 1")
 
             # Delete several items to Trash, restore one, then empty Trash.
@@ -425,8 +497,8 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('checkbox', name='Select pair.zip').check()
             act('Delete')
             page.get_by_role('button', name='Confirm', exact=True).click()
-            page.get_by_role('button', name='dropped.txt', exact=True).wait_for(state='hidden')
-            page.get_by_role('button', name='pair.zip', exact=True).wait_for(state='hidden')
+            row('dropped.txt').wait_for(state='hidden')
+            row('pair.zip').wait_for(state='hidden')
             folder_nav.get_by_role('button', name='View Trash').click()
             page.get_by_role('button', name='Trash', exact=True).wait_for()
             page.get_by_role('row').filter(has_text='dropped.txt').get_by_role('button', name='Restore', exact=True).click()

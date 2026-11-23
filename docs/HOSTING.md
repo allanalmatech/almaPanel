@@ -139,8 +139,19 @@ File Manager screen has:
 
 Click a row to select it, Ctrl-click (Cmd-click on macOS) to add or remove
 rows, and Shift-click to select a range. You can also tick the row
-checkboxes. Double-click a row, or click its name, to open a folder or file.
-In the list, Ctrl+A selects all and Delete moves the selection to Trash.
+checkboxes.
+
+- Double-click a file to download it, or a folder to open it.
+- Click the name of an entry that is already the only one selected to rename
+  it in place. Enter or clicking elsewhere saves the new name, and Esc cancels.
+  F2 or **Rename** also starts renaming.
+- Right-click an entry for its actions menu: Download, View, Edit, Move, Copy,
+  Rename, Change Permissions, Delete and Compress, plus Open for folders and
+  Extract for ZIPs. Right-clicking inside a multiple selection applies the
+  menu to every selected entry. With the keyboard, press Shift+F10 or the
+  Menu key, then use the arrow keys, Enter and Esc.
+- In the list, Ctrl+A selects all, Enter downloads a file or opens a folder,
+  and Delete moves the selection to Trash.
 **Settings** controls **Show hidden files** and an owner and group column;
 the browser remembers these choices.
 

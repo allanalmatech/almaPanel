@@ -80,6 +80,18 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.14
+
+- Right-click an entry in File Manager for an actions menu: Download, View, Edit,
+  Move, Copy, Rename, Change Permissions, Delete and Compress, plus Open for
+  folders and Extract for ZIPs. The menu works on the current selection and
+  supports arrow keys, Home, End and Esc. Shift+F10 or the Menu key opens it.
+- Double-click a file to download it, or a folder to open it.
+- A single click selects an entry. A second, separate click on the selected entry's
+  name renames it in place. Enter or leaving the field saves, and Esc cancels.
+  F2, the toolbar and the menu also start renaming.
+- Enter downloads the focused file or opens the focused folder.
+
 ## 0.1.0-alpha.13
 
 - Open File Manager in its own full-page browser tab for the selected hosting
