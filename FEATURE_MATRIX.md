@@ -1,7 +1,7 @@
 # Feature matrix
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**Alpha.15 evaluation.** Core installation and first-admin setup were verified by
+**Alpha.16 evaluation.** The full requested tool list and its phases are in [docs/ROADMAP.md](docs/ROADMAP.md). Core installation and first-admin setup were verified by
 the operator on Amazon Linux 2023 during alpha.1. The table distinguishes local
 tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 
@@ -17,6 +17,11 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Privileged agent | Foundation | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | UID-checked Unix socket and closed operation list |
 | Frontend shell | Foundation | Implemented locally / partial | Not applicable or control-plane only | Chromium role, search, layout, collapse and mobile-drawer checks | Ubuntu 24.04 / AL2023 | Short role-aware sidebar with searchable dashboard groups; screen-reader and other-browser acceptance pending |
 | Installation framework | Foundation | Partial | Ubuntu and Amazon Linux adapters | Amazon Linux alpha.1 installed by operator | Ubuntu 24.04 / AL2023 | Fresh alpha.3 runs and reboot pending |
+| Indexes | Advanced | Implemented locally | Per-folder Nginx autoindex; hidden files and scripts keep their deny and PHP rules | Unit tests and a real Nginx server over HTTP | Ubuntu 24.04 / AL2023 | Folder names use letters, digits, - and _ |
+| Error Pages | Advanced | Implemented locally | Nginx error_page for 400–504 to pages inside the website | Real Nginx serves a custom 404 as HTML | Ubuntu 24.04 / AL2023 | Pages must exist in the website |
+| MIME Types | Advanced | Implemented locally | Site types merged with the default list; script extensions refused | Real Nginx content types checked | Ubuntu 24.04 / AL2023 | Up to 50 types per website |
+| Hotlink Protection | Security | Implemented locally | Nginx valid_referers with allowed hosts, optional direct requests, 403 or redirect | Real Nginx referer checks | Ubuntu 24.04 / AL2023 | Referer headers can be absent or forged; this deters casual embedding |
+| Optimize Website | Software | Implemented locally | Nginx gzip for text types per website | Real Nginx compression checked | Ubuntu 24.04 / AL2023 | On/off only |
 | File Manager | Files | Implemented and locally verified | Account UID, descriptor paths, private staging, scoped search, multi-select bulk copy/move/delete/permissions, multi-entry ZIP, Empty Trash and restore; opens in its own tab, with a full-page editor tab per file; right-click menu, inline rename and double-click download | Linux helper, WSGI and Chromium tests | Ubuntu 24.04 / AL2023 | Sorting applies per 100-entry page; no drag-to-move; installed VM acceptance pending |
 | Images | Files | Implemented in File Manager | Image previews and resize/convert to PNG, JPEG or WebP with unused-path writes | Chromium decoded a PNG and saved a resized WebP | Ubuntu 24.04 / AL2023 | File-by-file conversion; 16 megapixel output limit |
 | Directory Privacy | Files | Implemented locally | Nginx HTTPS Basic authentication | Local real static and PHP route checks | Ubuntu 24.04 / AL2023 | Dedicated document root; one login per rule |

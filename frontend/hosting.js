@@ -1031,3 +1031,98 @@ async function hostingAccountsView(epoch) {
         location.hash = 'jobs';
     });
 }
+
+// Website options: Indexes, Error Pages, Hotlink Protection and MIME Types share one per-website endpoint.
+const siteOptionPages = {
+    indexes: ['Indexes', 'Choose which folders show a file listing when they have no index page. Hidden files and scripts are never listed.'],
+    error_pages: ['Error Pages', 'Show your own pages for common HTTP errors. Pages are paths inside the website, such as /errors/404.html.'],
+    hotlink: ['Hotlink Protection', 'Stop other websites from embedding your images and media. Requests from your own domains are always allowed.'],
+    mime: ['MIME Types', 'Tell browsers how to handle file extensions the server does not already know.'],
+    optimize: ['Optimize Website', 'Compress text content such as HTML, CSS, JavaScript and JSON so pages load faster.']
+};
+
+async function siteOptionsView(epoch, section) {
+    const base = boundAccount();
+    const [title, description] = siteOptionPages[section];
+    const domains = (await api(base + 'tls')).sites.filter(site => !site.kind || site.kind === 'site');
+    if (!activeView(epoch, base)) return;
+    view(title, description, '<section class="panel">' + (domains.length
+        ? `<label>Website<select id="option-site">${domains.map(item => `<option>${esc(item.name)}</option>`).join('')}</select></label>
+           <div id="option-controls" aria-live="polite"></div>`
+        : '<p>Add a website under Domains first.</p>') + '</section>');
+    if (!domains.length) return;
+    const select = $('#option-site');
+    const endpoint = base + 'site-options';
+    const save = async values => {
+        const result = await api(endpoint, {action: 'set', domain: select.value, section, values});
+        notice(result.message);
+        await load();
+    };
+
+    async function load() {
+        const domain = select.value;
+        const data = await api(endpoint + '?domain=' + encodeURIComponent(domain));
+        if (!activeView(epoch, base) || select.value !== domain) return;
+        const controls = $('#option-controls');
+        if (section === 'indexes') {
+            controls.innerHTML = '<h2>Folders with file listings</h2>' +
+                table(['Folder', ''], data.indexes.map((path, index) => [esc(path),
+                    `<button class="subtle" data-remove-index="${index}">Turn off listing</button>`])) +
+                `<form id="option-form">${field('path', 'Folder (/ for the whole website)', 'text', 'placeholder="/downloads" maxlength="257"')}
+                 <button type="submit">Turn on listing</button></form>
+                 <p class="note">Folders without listing return 403 when they have no index page. Use letters, digits, - and _ in folder names.</p>`;
+            form('#option-form', async fields => save([...data.indexes, fields.path.trim()]));
+            actionHandler(controls, '[data-remove-index]', async button =>
+                save(data.indexes.filter((_, index) => index !== Number(button.dataset.removeIndex))));
+        } else if (section === 'error_pages') {
+            const codes = {400: 'Bad request', 401: 'Authorization required', 403: 'Forbidden', 404: 'Not found',
+                500: 'Internal server error', 502: 'Bad gateway', 503: 'Service unavailable', 504: 'Gateway timeout'};
+            controls.innerHTML = `<form id="option-form"><h2>Error pages</h2>${Object.entries(codes).map(([code, label]) =>
+                `<label>${code} ${label}<input name="${code}" maxlength="257" placeholder="Server default" value="${esc(data.error_pages[code] || '')}"></label>`).join('')}
+                <button type="submit">Save error pages</button></form>
+                <p class="note">Create the pages in File Manager first. Leave a field empty to use the server default.</p>`;
+            form('#option-form', async fields => save(Object.fromEntries(Object.entries(fields).map(([code, page]) => [code, page.trim()]))));
+        } else if (section === 'hotlink') {
+            const rule = data.hotlink;
+            controls.innerHTML = `<form id="option-form">
+                <label class="file-check"><input type="checkbox" name="enabled"${rule.enabled ? ' checked' : ''}> Turn on hotlink protection</label>
+                <label>Other websites allowed to embed files (one per line, such as cdn.example.com or *.example.com)
+                  <textarea name="allowed" rows="4" maxlength="2000">${esc(rule.allowed.join('\n'))}</textarea></label>
+                <label>Protected extensions (comma-separated)<input name="extensions" maxlength="400" value="${esc(rule.extensions.join(', '))}"></label>
+                <label class="file-check"><input type="checkbox" name="allow_direct"${rule.allow_direct ? ' checked' : ''}> Allow direct requests (no referring page), such as typing the address or some privacy tools</label>
+                <label>Send blocked requests to this URL (optional; otherwise 403 Forbidden)<input name="redirect" type="url" maxlength="1500" value="${esc(rule.redirect)}"></label>
+                <button type="submit">Save hotlink protection</button></form>
+                <p class="note">${rule.enabled ? 'Protection is on.' : 'Protection is off.'} Your own domain names and aliases are always allowed.</p>`;
+            form('#option-form', async (fields, element) => save({
+                enabled: element.elements.enabled.checked, allow_direct: element.elements.allow_direct.checked,
+                allowed: fields.allowed.split('\n').map(item => item.trim()).filter(Boolean),
+                extensions: fields.extensions.split(',').map(item => item.trim()).filter(Boolean),
+                redirect: fields.redirect.trim()
+            }));
+        } else if (section === 'optimize') {
+            controls.innerHTML = `<form id="option-form"><h2>Compression</h2>
+                <label class="file-check"><input type="radio" name="compress" value="off"${data.optimize.compress ? '' : ' checked'}> Do not compress content</label>
+                <label class="file-check"><input type="radio" name="compress" value="on"${data.optimize.compress ? ' checked' : ''}> Compress text content (HTML, CSS, JavaScript, JSON, XML, SVG and fonts)</label>
+                <button type="submit">Save optimization</button></form>
+                <p class="note">Images, video and archives are already compressed and are sent unchanged. Pages that show secrets on HTTPS can be exposed to the BREACH attack when compressed; most websites are not affected.</p>`;
+            form('#option-form', async fields => save({compress: fields.compress === 'on'}));
+        } else {
+            const entries = Object.entries(data.mime);
+            controls.innerHTML = '<h2>Custom MIME types</h2>' +
+                table(['Extension', 'MIME type', ''], entries.map(([extension, media]) => [esc('.' + extension), esc(media),
+                    `<button class="subtle" data-remove-mime="${esc(extension)}">Remove</button>`])) +
+                `<form id="option-form">${field('extension', 'Extension', 'text', 'placeholder="webmanifest" maxlength="17"')}
+                 ${field('media', 'MIME type', 'text', 'placeholder="application/manifest+json" maxlength="190"')}
+                 <button type="submit">Add MIME type</button></form>
+                 <p class="note">Custom types also replace the server's type for that extension. Script extensions such as .php cannot be changed.</p>`;
+            form('#option-form', async fields => save({...data.mime, [fields.extension.trim().replace(/^\./, '')]: fields.media.trim()}));
+            actionHandler(controls, '[data-remove-mime]', async button => {
+                const next = {...data.mime};
+                delete next[button.dataset.removeMime];
+                await save(next);
+            });
+        }
+    }
+    select.onchange = () => load().catch(error => notice(error.message));
+    await load();
+}

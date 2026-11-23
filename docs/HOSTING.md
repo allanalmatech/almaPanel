@@ -256,3 +256,25 @@ script checks upload, chroot isolation and revocation.
 Administrators can set up Postfix and Dovecot where no mail server is already
 configured. Users manage their own mailboxes and forwarders in **Email Accounts**.
 The [mail setup guide](MAIL.md) covers TLS, DNS, loopback testing and external access.
+
+## Website options
+
+Choose a website at the top of each tool. Changes are tested with Nginx before
+they apply; if the test fails, the previous settings stay in place.
+
+- **Indexes** (Advanced): list folders such as `/downloads` that show a file
+  listing when they have no index page. `/` lists the whole website. Hidden files
+  are never listed and scripts still run through PHP.
+- **Error Pages** (Advanced): set a page inside the website, such as
+  `/errors/404.html`, for codes 400, 401, 403, 404, 500, 502, 503 and 504.
+  Create the page in File Manager first.
+- **MIME Types** (Advanced): add a type for an extension, such as
+  `webmanifest` → `application/manifest+json`. A custom type replaces the
+  server's type for that extension. Script extensions cannot be changed.
+- **Hotlink Protection** (Security): refuse image and media requests from other
+  websites. Your own domains are always allowed; add partner sites, choose the
+  extensions, and optionally redirect blocked requests. Browsers can omit the
+  referring page, so keep **Allow direct requests** on unless you need stricter
+  blocking.
+- **Optimize Website** (Software): compress HTML, CSS, JavaScript, JSON, XML, SVG
+  and fonts. Images, video and archives are sent unchanged.

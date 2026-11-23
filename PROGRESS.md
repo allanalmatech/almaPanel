@@ -339,3 +339,26 @@ behavior changed.
 - `make check` passed 81 tests.
 - A new browser check delays the session check and polls for any visible
   sign-in form or sidebar. It reproduced both flashes on alpha.14 and passes now.
+
+## 2026-11-23 · 0.1.0-alpha.16
+
+The owner asked for the complete tool set shown in two reference screenshots:
+Email, Files, Databases, Domains, Metrics, Security, Software, Advanced,
+Preferences and Billing & Support. docs/ROADMAP.md maps all of them. Each tool
+is available, an alias of an existing tool, planned in phases A–E, not bundled
+(a third-party product), or not applicable (Apache Handlers under Nginx).
+
+The dashboard now lists all 84 tools for administrators, 40 of them available.
+Planned tiles carry a badge and open a status page. This increment adds five
+working tools as per-website Nginx options in `agent/site_options.py`: Indexes,
+Error Pages, MIME Types, Hotlink Protection and Optimize Website. Values are
+validated against strict patterns, script extensions are refused, and
+deny rules stay ahead of hotlink rules. Configurations are applied through
+the existing `nginx -t` and rollback path. Sites without options render
+exactly as before.
+
+- `make check` passed 92 tests, including 11 website option tests. Two of
+  them serve a rendered site with Nginx 1.24 and check its behavior over HTTP.
+- The Chromium suite passed the regrouped dashboard, alias tiles, planned
+  status page and the five new tool screens.
+- Installed Amazon Linux acceptance is pending.

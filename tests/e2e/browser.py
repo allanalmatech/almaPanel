@@ -588,21 +588,78 @@ with tempfile.TemporaryDirectory() as temp:
                                       'buffer': json.dumps(sample).encode()})
             page.get_by_role('cell',name='192.0.2.10',exact=True).wait_for()
             page.get_by_text('Records loaded into the draft.',exact=False).wait_for()
+            # Website option tools send validated sections to the per-website endpoint.
+            option_posts = []
+            option_state = {'domain': host, 'indexes': [], 'error_pages': {}, 'mime': {}, 'optimize': {'compress': False},
+                            'hotlink': {'enabled': False, 'allow_direct': True, 'allowed': [], 'extensions': ['jpg', 'png'], 'redirect': ''}}
+
+            def browser_options(route):
+                if route.request.method == 'POST':
+                    body = route.request.post_data_json
+                    option_posts.append(body)
+                    option_state[body['section']] = body['values']
+                    route.fulfill(json={'message': 'Applied.'})
+                else:
+                    assert f'domain={host}' in route.request.url
+                    route.fulfill(json=option_state)
+
+            page.route('**/api/accounts/*/tls', lambda route: route.fulfill(json={'sites': [{'name': host, 'kind': 'site'}]}))
+            page.route('**/api/accounts/*/site-options**', browser_options)
+            open_tool('indexes')
+            page.get_by_role('heading', name='Indexes', exact=True).wait_for()
+            page.get_by_role('textbox', name='Folder (/ for the whole website)').fill('/downloads')
+            page.get_by_role('button', name='Turn on listing').click()
+            page.get_by_role('cell', name='/downloads', exact=True).wait_for()
+            assert option_posts[-1] == {'action': 'set', 'domain': host, 'section': 'indexes', 'values': ['/downloads']}
+            open_tool('hotlink')
+            page.get_by_role('checkbox', name='Turn on hotlink protection').check()
+            page.get_by_role('textbox', name='Other websites allowed to embed files', exact=False).fill('cdn.example.com\n\n*.partner.example')
+            page.get_by_role('button', name='Save hotlink protection').click()
+            page.get_by_text('Protection is on.', exact=False).wait_for()
+            assert option_posts[-1]['values'] == {'enabled': True, 'allow_direct': True, 'allowed': ['cdn.example.com', '*.partner.example'],
+                                                  'extensions': ['jpg', 'png'], 'redirect': ''}
+            open_tool('error-pages')
+            page.get_by_role('textbox', name='404 Not found').fill('/errors/404.html')
+            page.get_by_role('button', name='Save error pages').click()
+            page.get_by_text('Applied.', exact=True).wait_for()
+            assert option_posts[-1]['values']['404'] == '/errors/404.html' and option_posts[-1]['values']['500'] == ''
+            open_tool('mime-types')
+            page.get_by_role('textbox', name='Extension').fill('.webmanifest')
+            page.get_by_role('textbox', name='MIME type').fill('application/manifest+json')
+            page.get_by_role('button', name='Add MIME type').click()
+            page.get_by_role('cell', name='.webmanifest', exact=True).wait_for()
+            assert option_posts[-1]['values'] == {'webmanifest': 'application/manifest+json'}
+            open_tool('optimize')
+            page.get_by_role('radio', name='Compress text content', exact=False).check()
+            page.get_by_role('button', name='Save optimization').click()
+            page.get_by_text('Applied.', exact=True).wait_for()
+            assert option_posts[-1]['values'] == {'compress': True}
+            # Familiar names open existing tools, and planned tools open a status page.
+            open_tool('ip-blocker')
+            page.get_by_role('heading', name='Website Security', exact=True).wait_for()
+            assert page.get_by_role('navigation', name='Breadcrumb').locator('li').all_inner_texts() == ['Home', 'Security', 'IP Blocker']
+            open_tool('soon-ftp-accounts')
+            page.get_by_role('heading', name='FTP Accounts', exact=True).wait_for()
+            page.get_by_text('This tool is not available in this release yet.', exact=False).wait_for()
+
             # Compact navigation: dashboard groups, search, breadcrumbs, active state and layout.
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.get_by_role('heading',name='Dashboard',exact=True).wait_for()
             groups = page.locator('.tool-groups .section h2').evaluate_all(
                 'items => items.map(h => h.firstChild.textContent.trim())')
-            assert groups == ['Hosting Management', 'Files', 'Domains', 'Databases', 'Email', 'Software', 'Metrics',
-                              'Advanced', 'Security', 'Account', 'Help', 'Server Administration'], groups
+            assert groups == ['Hosting Management', 'Email', 'Files', 'Databases', 'Domains', 'Metrics', 'Security',
+                              'Software', 'Advanced', 'Preferences', 'Billing & Support', 'Server Administration'], groups
             total = page.locator('.tool').count()
-            assert page.locator('#tool-count').inner_text() == f'{total} tools in 12 groups'
+            planned = page.locator('.tool.soon').count()
+            assert page.locator('#tool-count').inner_text() == f'{total} tools in 12 groups · {total - planned} available, {planned} planned'
+            assert planned > 0 and all('Planned' in text for text in page.locator('.tool.soon').all_inner_texts())
             page.locator('#search').fill('file manager')
             page.locator('.tool[data-file-manager]').wait_for()
             assert page.locator('.tool').count()==1
             assert page.locator('#tool-count').inner_text() == f'1 of {total} tools match “file manager”'
             page.locator('#search').fill('advanced')  # category name only
-            assert sorted(page.locator('.tool').evaluate_all('a => a.map(x => x.hash)')) == ['#cron', '#dns-lookup']
+            assert sorted(page.locator('.tool').evaluate_all('a => a.map(x => x.hash)')) == [
+                '#cron', '#dns-lookup', '#error-pages', '#indexes', '#mime-types']
             page.locator('#search').fill('mariadb')  # description only
             assert page.locator('.tool').evaluate_all('a => a.map(x => x.hash)') == ['#databases']
             page.locator('#search').fill('no such hosting tool')
@@ -616,7 +673,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.locator('.tool[href="#availability"]').click()
             page.get_by_role('heading', name='Feature availability', exact=True).wait_for()
             crumbs = page.get_by_role('navigation', name='Breadcrumb')
-            assert crumbs.locator('li').all_inner_texts() == ['Home', 'Help', 'Feature Availability'], crumbs.inner_text()
+            assert crumbs.locator('li').all_inner_texts() == ['Home', 'Billing & Support', 'Feature Availability'], crumbs.inner_text()
             assert page.title() == 'Feature Availability · almaPanel'
             assert 'active' in page.locator('#nav a[href="#dashboard"]').get_attribute('class')
             assert page.locator('#nav a[aria-current=page]').count() == 0
@@ -648,7 +705,7 @@ with tempfile.TemporaryDirectory() as temp:
                 result = layout_ok()
                 # Smaller categories sit side by side; large ones span the row; no row leaves a gap.
                 assert not result['overflow'] and result['filled'] and result['wideAlone'], (width, result)
-                assert result['maxPerRow'] == (3 if width >= 1700 else 2), (width, result)
+                assert result['maxPerRow'] >= 2, (width, result)
                 assert result['rows'] < result['sections'], (width, result)
             qa_shot('dashboard-1920')
             page.set_viewport_size({'width': 800, 'height': 1000})

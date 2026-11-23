@@ -547,3 +547,17 @@ remaining behavior and live acceptance before completion.
 - [x] Double-click downloads files and opens folders.
 - [x] Second-click inline rename, plus F2, toolbar and menu rename.
 - [ ] Touch long-press for the actions menu on phones and tablets.
+
+## Alpha.16 requested tool set
+
+The full list, phases and requirements are in docs/ROADMAP.md.
+
+- [x] Regroup the dashboard to list every requested tool, with Planned badges.
+- [x] Indexes, Error Pages, MIME Types, Hotlink Protection and Optimize Website.
+- [ ] Phase A – email tools (default address, autoresponders, filters, disk usage,
+  delivery tracking, deliverability and DKIM, spam and greylisting, routing, importer).
+- [ ] Phase B – FTP, Web Disk, wizards, private Git, remote database access, database manager.
+- [ ] Phase C – PHP versions, Node.js and Python apps, app installer, packages, SSH, mailing lists.
+- [ ] Phase D – tenant zone editor, dynamic DNS, publisher, builder, visitor and resource metrics.
+- [ ] Phase E – ModSecurity, malware scanning, leech protection, mail encryption, languages, billing.
+- [ ] Validate the alpha.16 website options on the installed Amazon Linux panel.

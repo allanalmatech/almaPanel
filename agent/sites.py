@@ -134,17 +134,21 @@ def render(base, php_run, account, host, meta, suspended=False):
         root = base / account / 'public_html'
         if relative:
             root /= relative
+        fallback = ('$uri $uri/ /index.php?$args' if parent.get('application', {}).get('type') == 'wordpress'
+                    else '$uri $uri/ =404')
+        from agent.site_options import render as render_options
+        option_directives, option_locations = render_options(parent, fallback)
         content = (
             f' root {root};\n'
             ' index index.php index.html;\n'
             f" client_max_body_size {(meta.get('php') or {}).get('upload_mib', 8) + 1}m;\n"
             ' disable_symlinks on;\n'
-            + (' location / { try_files $uri $uri/ /index.php?$args; }\n'
-             if parent.get('application', {}).get('type') == 'wordpress' else
-             ' location / { try_files $uri $uri/ =404; }\n')
+            + option_directives
+            + f' location / {{ try_files {fallback}; }}\n'
             + ' location ~ /\\. { deny all; }\n'
             ' location ~* \\.(?:bak|old|orig|sql|pgdump|log|ini)$ { deny all; }\n'
             ' location ~* \\.p(?:html|har|hp[0-9]+)$ { deny all; }\n'
+            + option_locations +
             ' location ~ \\.php$ {\n'
             '  try_files $uri =404;\n'
             '  include fastcgi_params;\n'

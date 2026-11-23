@@ -255,6 +255,8 @@ def api(env, body, db, headers):
             return hosting.sftp(db, user, account, method, body, ip)
         if action == 'site-security':
             return hosting.site_security(db, user, account, method, env, body, ip)
+        if action == 'site-options':
+            return hosting.site_options(db, user, account, method, env, body, ip)
         if action == 'php':
             return hosting.php(db, user, account, method, env, body, ip)
         if action == 'tls':

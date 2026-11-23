@@ -73,6 +73,20 @@ editor tabs by 0.6 seconds to simulate a remote server. It polls those tabs
 every 10 ms and fails if the sign-in form or panel sidebar ever becomes
 visible. This check failed on alpha.14 and passes on alpha.15.
 
+Since alpha.16 the suite checks:
+
+- The regrouped dashboard and its Planned tiles, and the status page they open.
+- The alias tiles and their breadcrumbs.
+- The requests sent by the Indexes, Hotlink Protection, Error Pages, MIME Types
+  and Optimize Website screens.
+
+`tests/test_site_options.py` validates every option. When Nginx is installed and
+the test runs as root, it serves a rendered site with a real Nginx and checks:
+
+- listings only where they are enabled, hidden files denied and PHP source never served
+- the custom 404 page served as HTML, and custom MIME types
+- hotlink 403s and redirects, and gzip compression.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

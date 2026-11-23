@@ -235,3 +235,8 @@ kbd{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(-
 #boot p{margin:0;font-size:14px}
 @media(prefers-reduced-motion:no-preference){#boot img{animation:boot-pulse 1.2s ease-in-out infinite alternate}}
 @keyframes boot-pulse{from{opacity:.45}to{opacity:1}}
+
+/* Planned dashboard tools stay visible but read as not yet available. */
+.tool.soon{color:var(--muted)}
+.tool.soon svg{color:var(--muted);opacity:.7}
+.tool .badge{margin-left:6px;font-style:normal;font-size:9px;padding:1px 5px;vertical-align:1px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}

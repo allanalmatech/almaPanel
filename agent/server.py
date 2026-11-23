@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import sys
 from backend.core import name,domain,Problem
-from agent import databases, dns, files, mail, metrics, php_settings, sftp_access, site_security, sites
+from agent import databases, dns, files, mail, metrics, php_settings, sftp_access, site_options, site_security, sites
 
 BASE=Path('/srv/almapanel/accounts')
 REGISTRY=Path('/var/lib/almapanel-agent/registry.json')
@@ -383,6 +383,32 @@ def protect_site(operation, account, data, args):
     return {'message': 'Directory password protection saved.'}
 
 
+def website_options(operation, account, data, args):
+    from copy import deepcopy
+
+    host = domain(args.get('domain'))
+    meta = data[account]
+    if host not in meta['domains']:
+        raise ValueError('Domain does not belong to this account.')
+    site = meta.setdefault('sites', {}).setdefault(host, {})
+    if site.get('kind', 'site') != 'site':
+        raise ValueError('Choose a website instead of an alias or redirect.')
+    if operation == 'site_options.get':
+        return {'domain': host, **site_options.current(site)}
+    if operation != 'site_options.set':
+        raise ValueError('Website option operation not allowed.')
+    section = args.get('section')
+    if section not in site_options.SECTIONS:
+        raise ValueError('Choose indexes, error pages, hotlink protection or MIME types.')
+    value = site_options.validate(section, args.get('values'))
+    before = deepcopy(meta)
+    site.setdefault('options', {})[section] = value
+    apply_sites(account, data, before)
+    labels = {'indexes': 'Directory index settings', 'error_pages': 'Error pages',
+              'hotlink': 'Hotlink protection', 'mime': 'MIME types', 'optimize': 'Website optimization'}
+    return {'message': labels[section] + ' applied.', section: value}
+
+
 def install_wordpress(account, data, args):
     from copy import deepcopy
     from agent.wordpress import VERSION
@@ -525,6 +551,8 @@ def dispatch(operation,args):
         return sftp_access.manage(operation, account, data, args, atomic, save)
     if operation.startswith('site_security.'):
         return protect_site(operation, account, data, args)
+    if operation.startswith('site_options.'):
+        return website_options(operation, account, data, args)
     if operation == 'metrics.web':
         host = domain(args.get('domain'))
         if host not in data[account]['domains']:

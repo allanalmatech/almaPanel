@@ -80,6 +80,19 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.16
+
+- Reorganize the dashboard into Email, Files, Databases, Domains, Metrics,
+  Security, Software, Advanced, Preferences and Billing & Support, listing every
+  requested tool. Tools not built yet carry a Planned badge and open a status
+  page instead of a form. See docs/ROADMAP.md for phases.
+- Add Indexes, Error Pages, MIME Types, Hotlink Protection and Optimize Website
+  (compression) as per-website Nginx options. The agent validates every value,
+  tests the Nginx configuration and rolls back on failure.
+- Add Forwarders, Directory Privacy, IP Blocker, Redirects, SSL/TLS Status,
+  Two-Factor Authentication and Images tiles that open the existing tools.
+- Add `GET/POST /accounts/{id}/site-options`.
+
 ## 0.1.0-alpha.15
 
 - Stop new File Manager and editor tabs from briefly showing the sign-in form

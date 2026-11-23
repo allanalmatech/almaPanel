@@ -256,6 +256,21 @@ def site_security(db, user, account, method, env, body, ip):
     return result
 
 
+def site_options(db, user, account, method, env, body, ip):
+    query = parse_qs(env.get('QUERY_STRING', ''))
+    host = c.domain(query.get('domain', [''])[0] if method == 'GET' else body.get('domain'))
+    find_domain(db, account, host)
+    if method == 'GET':
+        return c.rpc('site_options.get', name=account['name'], domain=host)
+    allowed(body, {'set'})
+    section = body.get('section')
+    if section not in ('indexes', 'error_pages', 'hotlink', 'mime', 'optimize'):
+        raise c.Problem('Choose indexes, error pages, hotlink protection or MIME types.')
+    result = c.rpc('site_options.set', name=account['name'], domain=host, section=section, values=body.get('values'))
+    c.audit(db, user['id'], f'site_options.{section}', host, ip)
+    return result
+
+
 def sftp(db, user, account, method, body, ip):
     if method == 'GET':
         return c.rpc('sftp.list', name=account['name'])

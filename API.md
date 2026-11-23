@@ -387,6 +387,7 @@ credentials go directly to the local agent and stay out of job payloads.
 | `/accounts/{id}/databases` | GET, POST | List databases and engines, or create, inspect size, reset password, import, export, download, delete export or delete a database. |
 | `/accounts/{id}/tls` | GET, POST | List certificate status and document roots, or issue, upload or toggle HTTPS redirect. |
 | `/accounts/{id}/dns?domain=…` | GET, POST | Administrator-only forward DNS. Save replaces the typed record list. |
+| `/accounts/{id}/site-options?domain=…` | GET, POST | Read website options, or `set` one `section`: `indexes` (folder list), `error_pages` (HTTP code to page path), `hotlink` (`enabled`, `allow_direct`, `allowed`, `extensions`, `redirect`), `mime` (extension to media type) or `optimize` (`compress`). Script extensions are refused. |
 | `/accounts/{id}/site-security?domain=…` | GET, POST | List site protections or set/remove a directory password or save an IP blocklist. |
 | `/accounts/{id}/metrics?domain=…` | GET | Show per-site access sample, or account processes when no domain is provided. |
 | `/accounts/{id}/php` | GET, POST | Read and set pool parameters. GET with `?view=log` returns the error tail. |

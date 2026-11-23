@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.15",
+    "version": "0.1.0-alpha.16",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -5547,6 +5547,164 @@
               "schema": {
                 "type": "object",
                 "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/site-options": {
+      "get": {
+        "summary": "Read website options: indexes, error pages, hotlink protection, MIME types and compression",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Operation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Apply one website option section",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Operation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action",
+                  "domain",
+                  "section",
+                  "values"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "set"
+                    ]
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "section": {
+                    "type": "string",
+                    "enum": [
+                      "indexes",
+                      "error_pages",
+                      "hotlink",
+                      "mime",
+                      "optimize"
+                    ]
+                  },
+                  "values": {
+                    "description": "indexes: array of folder paths (\"/\" or \"/folder\"); error_pages: object of HTTP code (400,401,403,404,500,502,503,504) to page path; hotlink: {enabled, allow_direct, allowed[], extensions[], redirect}; mime: object of extension to media type; optimize: {compress}"
+                  }
+                }
               }
             }
           }
