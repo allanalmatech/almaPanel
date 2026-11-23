@@ -80,6 +80,14 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.15
+
+- Stop new File Manager and editor tabs from briefly showing the sign-in form
+  and the panel sidebar. Pages now start on a neutral "Opening almaPanel…"
+  screen while the existing session is checked. The sign-in form appears only
+  without a valid session, and full-page tabs choose their layout before
+  anything is drawn.
+
 ## 0.1.0-alpha.14
 
 - Right-click an entry in File Manager for an actions menu: Download, View, Edit,

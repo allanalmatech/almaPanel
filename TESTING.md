@@ -68,6 +68,11 @@ Since alpha.14 the suite also checks:
 - Second-click rename, including the delay, the selected base name and Esc.
 - F2 rename, and rename saved by Enter or by leaving the field.
 
+Since alpha.15 the suite delays the session check in new File Manager and
+editor tabs by 0.6 seconds to simulate a remote server. It polls those tabs
+every 10 ms and fails if the sign-in form or panel sidebar ever becomes
+visible. This check failed on alpha.14 and passes on alpha.15.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

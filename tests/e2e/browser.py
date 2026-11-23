@@ -6,6 +6,8 @@ Requires playwright and Chromium. Screenshots are temporary QA output only.
 import io
 import os
 import json
+import re
+import time
 from pathlib import Path
 import secrets
 import ssl
@@ -41,6 +43,29 @@ with tempfile.TemporaryDirectory() as temp:
         with sync_playwright() as pw:
             browser=pw.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])
             context=browser.new_context(ignore_https_errors=True,viewport={'width':1440,'height':1000})
+            # Record whether a File Manager or editor tab ever shows the sign-in form or panel sidebar.
+            context.add_init_script('''
+                window.__flashes = [];
+                const watch = () => {
+                    if (/^#(filemanager|editor)/.test(location.hash)) {
+                        for (const [id, label] of [['auth', 'sign-in'], ['sidebar', 'sidebar']]) {
+                            const element = document.getElementById(id);
+                            if (element?.checkVisibility() && !window.__flashes.includes(label)) window.__flashes.push(label);
+                        }
+                    }
+                };
+                // Timers keep running in background tabs, where animation frames pause.
+                const timer = setInterval(watch, 10);
+                setTimeout(() => clearInterval(timer), 15000);
+            ''')
+
+            def slow_session_check(route):
+                # Simulate a remote server (for example an SSH tunnel) so a start-up flash would be painted.
+                if re.search(r'#(filemanager|editor)', route.request.frame.url):
+                    time.sleep(0.6)
+                route.continue_()
+
+            context.route('**/api/me', slow_session_check)
             page=context.new_page();errors=[]
             page.on('pageerror',lambda e:errors.append(str(e)))
             page.goto(origin)
@@ -162,6 +187,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.get_by_role('heading', name='File Manager', exact=True).wait_for()
             assert not page.locator('#sidebar').is_visible() and not page.locator('.workspace > header').is_visible()
+            assert page.evaluate('() => window.__flashes') == [], page.evaluate('() => window.__flashes')
             assert page.locator('.fm-account').inner_text() == 'browserhost'
             page.get_by_text('used in this account', exact=False).wait_for()
             actions = page.get_by_role('toolbar', name='File actions')
@@ -269,6 +295,7 @@ with tempfile.TemporaryDirectory() as temp:
             editor.on('pageerror', lambda e: errors.append(str(e)))
             source = editor.get_by_role('textbox', name='File contents')
             editor.locator('.source-editor .code-keyword').filter(has_text='echo').wait_for()
+            assert editor.evaluate('() => window.__flashes') == [], editor.evaluate('() => window.__flashes')
             assert editor.locator('#ed-path').input_value() == 'public_html/assets/icons/file.php'
             assert editor.locator('#ed-encoding').input_value() == 'utf-8'
             assert editor.locator('#ed-language').input_value() == 'php'

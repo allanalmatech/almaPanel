@@ -228,3 +228,10 @@ kbd{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(-
 .fm-menu button:disabled{opacity:.4;cursor:default}
 .fm-menu button[hidden]{display:none}
 .fm-menu .fm-icon{width:16px;height:16px}
+
+/* Neutral start-up screen while the existing session is checked; sign-in shows only without one. */
+#boot{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted)}
+#boot img{width:44px;opacity:.9}
+#boot p{margin:0;font-size:14px}
+@media(prefers-reduced-motion:no-preference){#boot img{animation:boot-pulse 1.2s ease-in-out infinite alternate}}
+@keyframes boot-pulse{from{opacity:.45}to{opacity:1}}

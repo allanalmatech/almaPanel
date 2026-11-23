@@ -324,3 +324,18 @@ No API or agent changes.
 - `make check` passed 81 tests.
 - The Chromium suite passed the new menu, double-click and rename
   checks, along with all earlier workflows.
+
+## 2026-11-23 · 0.1.0-alpha.15
+
+The owner saw new tabs briefly show the sign-in form before opening.
+The page markup showed the sign-in section by default until `/api/me` confirmed
+the shared session. Over a remote connection, the form was visible long enough
+to look like a second login. The panel shell also appeared before the tab
+switched to its full-page layout. The page now starts on a neutral loading
+screen, reveals the sign-in form only when the session check fails, and picks
+the full-page layout from the address before boot. No sign-in or session
+behavior changed.
+
+- `make check` passed 81 tests.
+- A new browser check delays the session check and polls for any visible
+  sign-in form or sidebar. It reproduced both flashes on alpha.14 and passes now.
