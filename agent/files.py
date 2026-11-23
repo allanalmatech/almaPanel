@@ -66,6 +66,8 @@ def operate(root, request, private=None):
     if action == 'search':
         return file_tools.tree(root, parts, request.get('query', ''), request.get('include_hidden', True))
     if action == 'archive':
+        if 'names' in request:
+            return file_tools.archive_items(root, parts, request['names'], root, components(request.get('destination')))
         return file_tools.archive_tree(root, parts, root, components(request.get('destination')))
     if action == 'archive_contents':
         return file_tools.archive_contents(root, parts, request)

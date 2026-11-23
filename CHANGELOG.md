@@ -80,6 +80,23 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.12
+
+- Redesign File Manager with a search bar scoped to all files or the current
+  folder, an action toolbar, a folder panel with path box and Collapse All, and
+  a navigation bar with Home, Up One Level, Back, Forward, Reload, Select All,
+  Unselect All, View Trash and Empty Trash.
+- Select several entries with checkboxes, Ctrl-click, Shift-click, Select All
+  or Ctrl+A. Toolbar actions enable only when the selection supports them.
+- Copy, move, delete, change permissions and compress several entries at once;
+  rename, download, edit, view and extract a single entry.
+- Sort by name, size, modification time, type or permissions, with folders first,
+  and show a readable file type for each entry.
+- Add a File Manager settings dialog for hidden files and an owner/group column.
+- Add the `names` field to the `archive` file action to ZIP several entries
+  from one folder, with the existing archive limits and path checks.
+- File Manager uses the full workspace width.
+
 ## 0.1.0-alpha.11
 
 - Shorten the sidebar to Dashboard, Hosting Accounts (administrators and resellers),

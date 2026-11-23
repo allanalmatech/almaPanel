@@ -60,6 +60,31 @@ class FileTools(unittest.TestCase):
                     self.op('extract', 'bad.zip', destination='new')
                 self.assertEqual(list(self.root.iterdir()), [self.root / 'bad.zip'])
 
+    def test_archive_selected_items_from_one_folder(self):
+        (self.root / 'site' / 'css').mkdir(parents=True)
+        (self.root / 'site' / 'index.html').write_text('home')
+        (self.root / 'site' / 'css' / 'app.css').write_text('body{}')
+        (self.root / 'site' / 'skip.txt').write_text('not selected')
+        result = self.op('archive', 'site', names=['index.html', 'css'], destination='site/bundle.zip')
+        self.assertEqual(result['name'], 'bundle.zip')
+        with zipfile.ZipFile(self.root / 'site' / 'bundle.zip') as archive:
+            self.assertEqual(sorted(archive.namelist()), ['css/', 'css/app.css', 'index.html'])
+        (self.root / 'site' / 'link').symlink_to('/etc/passwd')
+        for names, destination in [([], 'a.zip'), (['../x'], 'a.zip'), (['css/app.css'], 'a.zip'),
+                                   (['index.html', 'index.html'], 'a.zip'), (['.alma-x'], 'a.zip'),
+                                   (['css'], 'site/css/inside.zip'), (['index.html'], 'site/index.html'),
+                                   (['link'], 'a.zip'), ([7], 'a.zip'), ('index.html', 'a.zip'),
+                                   (['index.html'], 'not-a-zip.txt'), (['x'] * 501, 'a.zip')]:
+            with self.subTest(names=str(names)[:40], destination=destination):
+                with self.assertRaises((ValueError, OSError)):
+                    self.op('archive', 'site', names=names, destination=destination)
+        self.assertFalse((self.root / 'a.zip').exists())
+        self.assertFalse((self.root / 'site' / 'css' / 'inside.zip').exists())
+        self.assertEqual((self.root / 'site' / 'index.html').read_text(), 'home')
+        # Failed attempts leave no staged or partial archives behind.
+        self.assertEqual(sorted(os.listdir(self.root / 'site')), ['bundle.zip', 'css', 'index.html', 'link', 'skip.txt'])
+        self.assertEqual(sorted(os.listdir(self.root)), ['site'])
+
     def test_archive_rejects_link_and_stops_at_size_budget(self):
         (self.root / 'input').mkdir()
         (self.root / 'input' / 'bad').symlink_to('/etc/passwd')

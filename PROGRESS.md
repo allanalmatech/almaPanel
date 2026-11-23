@@ -265,3 +265,28 @@ backdrop, the close button or a link. Signing out returns to the dashboard.
   reseller and hosting-user roles, five layout widths and a 390-pixel phone.
 - No API, agent or database changes. Installed Amazon Linux acceptance of
   the new navigation is pending the owner's upgrade.
+
+## 2026-11-23 · 0.1.0-alpha.12
+
+File Manager was reorganized around a toolbar layout at the owner's request.
+It uses original almaPanel icons and branding. The screen has scoped search,
+an action toolbar enabled by the current selection, a folder panel with a
+path box, Collapse All and the tree, and a navigation bar with Back/Forward
+history, Select All/Unselect All, View Trash and Empty Trash. Users select
+entries with checkboxes, Ctrl-click or Shift-click, and can copy, move,
+delete, change permissions on or compress several at once. The listing sorts
+by any column and shows readable file types.
+
+The agent's `archive` action accepts `names`, a list of entries in one
+folder, so Compress can make one ZIP from a mixed selection. It reuses the
+existing per-entry checks, shared size and entry budgets, staged output and
+no-overwrite publication. It rejects traversal, nested names, duplicates,
+reserved names, links and destinations inside a selected folder. Other bulk
+actions call the existing single-entry operations in turn and report each
+failure.
+
+- `make check` passed 81 tests, including the new multi-entry archive test.
+- The Chromium suite passed the new File Manager workflow against a real
+  filesystem fixture, plus all earlier navigation, mail, backup, DNS and
+  preference checks.
+- Installed Amazon Linux acceptance of the bulk operations is pending.

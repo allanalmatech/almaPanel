@@ -36,8 +36,8 @@ function validateFileName(name) {
     return name;
 }
 
-function folderTree(container, path, current, includeHidden, onSelect) {
-    const ancestors = current.split('/').filter(Boolean);
+function folderTree(container, path, current, includeHidden, onSelect, expandTo = current) {
+    const ancestors = expandTo.split('/').filter(Boolean);
     const expanded = new Set(['']);
     ancestors.reduce((parent, name) => {
         const next = joinFilePath(parent, name);
@@ -151,10 +151,12 @@ function fileDialog(title, content, submitLabel, run) {
 }
 
 function chooseFileTarget(path, title, folder, name, submitLabel, run) {
+    // name === null asks only for a destination folder (used for several selected items).
     const content = '<label>Folder under public_html<input name="folder" placeholder="public_html" maxlength="2048" value="' +
         esc(folder) + '"></label><details><summary>Browse folders</summary><div class="file-picker"></div></details>' +
-        '<label>Name<input name="filename" required maxlength="255" value="' + esc(name) + '"></label>';
+        (name === null ? '' : '<label>Name<input name="filename" required maxlength="255" value="' + esc(name) + '"></label>');
     const form = fileDialog(title, content, submitLabel, fields => {
+        if (name === null) return run(fields.folder.split('/').filter(Boolean).join('/'));
         const destination = joinFilePath(fields.folder, validateFileName(fields.filename));
         return run(destination);
     });
@@ -223,6 +225,63 @@ async function sendFileUpload(path, location, file, active, progress) {
     }
 }
 
+// Original 16px line icons for the File Manager toolbars.
+const FM_ICONS = {
+    file: '<path d="M4 1.5h5l3 3v10H4z"/><path d="M8 7v5M5.5 9.5h5"/>',
+    folder: '<path d="M1.5 4V2.5h5l1.5 2h6.5v9h-13z"/><path d="M8 7v4.5M5.8 9.2h4.4"/>',
+    copy: '<rect x="5" y="5" width="9" height="9" rx="1"/><path d="M11 5V2H2v9h3"/>',
+    move: '<path d="M8 1.5v13M1.5 8h13M8 1.5L6 3.5M8 1.5l2 2M8 14.5l-2-2M8 14.5l2-2M1.5 8l2-2M1.5 8l2 2M14.5 8l-2-2M14.5 8l-2 2"/>',
+    upload: '<path d="M8 11V2M4.5 5.5L8 2l3.5 3.5M2 10v4h12v-4"/>',
+    download: '<path d="M8 2v9M4.5 7.5L8 11l3.5-3.5M2 10v4h12v-4"/>',
+    delete: '<path d="M2.5 4h11M6 4V2h4v2M4 4l.8 10h6.4L12 4M6.8 6.5v5M9.2 6.5v5"/>',
+    rename: '<path d="M2 12.5h4M10.5 2.5l3 3L6 13H3v-3z"/>',
+    edit: '<path d="M11 1.5l3.5 3.5L6 13.5H2.5V10z"/><path d="M9.5 3l3.5 3.5"/>',
+    permissions: '<circle cx="5" cy="8" r="3"/><path d="M8 8h6.5M12 8v2.5M14.5 8v2"/>',
+    view: '<path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/>',
+    extract: '<path d="M9.5 6.5L14 2M10 2h4v4M6.5 9.5L2 14M2 10v4h4"/>',
+    compress: '<path d="M14 2L9.5 6.5M9.5 3v3.5H13M2 14l4.5-4.5M3 9.5h3.5V13"/>',
+    home: '<path d="M1.5 8L8 2l6.5 6M3.5 6.5V14h3.5v-4h2v4h3.5V6.5"/>',
+    up: '<path d="M8 14V3M4 7l4-4 4 4M3 1.5h10"/>',
+    back: '<path d="M14 8H2.5M7 3.5L2.5 8 7 12.5"/>',
+    forward: '<path d="M2 8h11.5M9 3.5L13.5 8 9 12.5"/>',
+    reload: '<path d="M13.5 8A5.5 5.5 0 1 1 11.6 3.8M12 1.5v3h-3"/>',
+    selectAll: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 8l2 2 4-4.5"/>',
+    selectNone: '<rect x="2" y="2" width="12" height="12" rx="1.5"/>',
+    trash: '<path d="M3 4.5h10M6 4.5V2.5h4v2M4.5 4.5l.7 9.5h5.6l.7-9.5"/>',
+    emptyTrash: '<path d="M3 4.5h10M6 4.5V2.5h4v2M4.5 4.5l.7 9.5h5.6l.7-9.5M6.5 7.5l3 3M9.5 7.5l-3 3"/>',
+    settings: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+    dir: '<path d="M1.5 3.5h5l1.5 1.5h6.5v8.5h-13z" fill="currentColor" fill-opacity=".18"/>',
+    doc: '<path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3"/>',
+    link: '<path d="M6.5 9.5l3-3M5 7L3.5 8.5a2.1 2.1 0 0 0 3 3L8 10M8 6l1.5-1.5a2.1 2.1 0 0 1 3 3L11 9"/>'
+};
+const fmIcon = name => '<svg class="fm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + FM_ICONS[name] + '</svg>';
+
+const fileTypeNames = {
+    php: 'PHP script', html: 'HTML page', htm: 'HTML page', css: 'Stylesheet', js: 'JavaScript', mjs: 'JavaScript',
+    json: 'JSON data', xml: 'XML document', txt: 'Text', md: 'Markdown', csv: 'CSV data', log: 'Log file',
+    ini: 'Configuration', conf: 'Configuration', yml: 'YAML', yaml: 'YAML', sql: 'SQL script', sh: 'Shell script',
+    py: 'Python script', svg: 'SVG image', png: 'PNG image', jpg: 'JPEG image', jpeg: 'JPEG image', gif: 'GIF image',
+    webp: 'WebP image', ico: 'Icon', pdf: 'PDF document', zip: 'ZIP archive', gz: 'Gzip archive', tar: 'Tar archive',
+    mp3: 'MP3 audio', wav: 'WAV audio', ogg: 'Ogg audio', mp4: 'MP4 video', webm: 'WebM video',
+    woff: 'Web font', woff2: 'Web font', ttf: 'Font', htaccess: 'Server rules'
+};
+
+function fileTypeName(entry) {
+    if (entry.directory) return 'Folder';
+    if (entry.symlink) return 'Symbolic link';
+    if (!entry.regular) return 'Special file';
+    const dot = entry.name.lastIndexOf('.');
+    const extension = dot >= 0 ? entry.name.slice(dot + 1).toLowerCase() : '';
+    return fileTypeNames[extension] || (extension ? extension.toUpperCase() + ' file' : 'File');
+}
+
+const fileSettingsKey = 'alma-file-manager';
+function fileSettings() {
+    try { return {showOwner: false, ...JSON.parse(localStorage.getItem(fileSettingsKey) || '{}')}; }
+    catch { return {showOwner: false}; }
+}
+
 async function fileManagerView(epoch) {
     const base = boundAccount();
     const path = base + 'files';
@@ -232,8 +291,11 @@ async function fileManagerView(epoch) {
         controller.abort();
     };
     const active = () => Boolean(me && activeView(epoch, base) && !controller.signal.aborted);
+    const settings = fileSettings();
+    if (typeof settings.showHidden === 'boolean') showHidden = settings.showHidden;
     let current = currentPath;
     let page = {entries: [], total: 0, next_offset: null};
+    let rows = [];
     let offset = 0;
     let browseRequest = 0;
     let selected;
@@ -241,26 +303,59 @@ async function fileManagerView(epoch) {
     let isDirty = () => false;
     let batch;
     let downloading = false;
+    let sortKey = 'name';
+    let sortAscending = true;
+    let anchor = null;
+    let treeExpandTo = null;
+    const chosen = new Set();
+    const past = [];
+    const ahead = [];
     fileViewHasUnsavedChanges = () => active() && isDirty();
 
-    view('File Manager', 'Browse, edit and transfer your website files in public_html.',
-        '<div class="file-layout"><aside class="panel file-folders"><h2>Folders</h2><nav id="file-tree" aria-label="Folder tree"></nav>' +
-        '<p id="file-storage" class="muted" role="status">Loading storage usage…</p><a href="#usage">Disk Usage</a></aside>' +
-        '<section class="panel file-browser"><nav class="file-crumbs" id="file-crumbs" aria-label="Current folder"></nav>' +
-        '<form id="file-location" class="file-location"><label>Folder path<input name="folder" maxlength="2048" placeholder="public_html"></label>' +
+    const tool = (cmd, label, iconName, extra = '') =>
+        '<button type="button" class="fm-btn" data-cmd="' + cmd + '" title="' + label + '"' + extra + '>' + fmIcon(iconName) + '<span>' + label + '</span></button>';
+    view('File Manager', 'Manage the files in your website folder, public_html.',
+        '<div class="fm">' +
+        '<div class="fm-head"><p id="file-storage" role="status">Loading storage usage…</p>' +
+        '<form id="file-search" class="fm-search" role="search"><label for="fm-scope">Search</label>' +
+        '<select id="fm-scope" name="scope" aria-label="Search scope"><option value="all">All your files</option>' +
+        '<option value="current">Current folder</option></select><label for="fm-query">for</label>' +
+        '<input id="fm-query" name="query" type="search" maxlength="120" required aria-label="Search files">' +
+        '<button type="submit">Go</button></form>' +
+        '<button type="button" class="fm-btn fm-settings" data-cmd="settings" title="Settings">' + fmIcon('settings') + '<span>Settings</span></button>' +
+        '</div>' +
+        '<div class="fm-tools" role="toolbar" aria-label="File actions">' +
+        tool('newfile', 'File', 'file', ' aria-label="New file"') + tool('newfolder', 'Folder', 'folder', ' aria-label="New folder"') +
+        tool('copy', 'Copy', 'copy') + tool('move', 'Move', 'move') + tool('upload', 'Upload', 'upload') +
+        tool('download', 'Download', 'download') + tool('delete', 'Delete', 'delete') +
+        '<span class="fm-sep" aria-hidden="true"></span>' +
+        tool('rename', 'Rename', 'rename') + tool('edit', 'Edit', 'edit') + tool('permissions', 'Permissions', 'permissions') +
+        tool('view', 'View', 'view') + '<span class="fm-sep" aria-hidden="true"></span>' +
+        tool('extract', 'Extract', 'extract') + tool('compress', 'Compress', 'compress') +
+        '<input type="file" id="upload" multiple hidden></div>' +
+        '<div class="fm-body"><aside class="fm-side" aria-label="Folders">' +
+        '<form id="file-location" class="fm-path"><button type="button" class="fm-home" data-cmd="home" aria-label="Go to public_html">' +
+        fmIcon('home') + '</button><input name="folder" maxlength="2048" placeholder="public_html" aria-label="Folder path">' +
         '<button type="submit" class="subtle">Go</button></form>' +
-        '<div class="toolbar file-tools"><button id="new-file">New file</button><button id="new-dir" class="subtle">New folder</button>' +
-        '<button id="archive-folder" class="subtle">Zip folder</button><button id="reload-files" class="subtle">Reload</button>' +
-        '<a href="#trash">Trash</a><a href="#backups">Website backups</a></div>' +
-        '<form id="file-search" class="file-location"><label>Search this folder and its subfolders<input name="query" type="search" maxlength="120" required></label>' +
-        '<button type="submit" class="subtle">Search</button></form><div id="file-results" aria-live="polite"></div>' +
-        '<div class="drop-zone" id="drop-files"><label>Upload or drop files (256 MiB each)<input type="file" id="upload" multiple></label>' +
-        '<div id="file-transfers" aria-live="polite"></div></div>' +
-        '<div class="file-list-header"><label class="file-check"><input id="hidden-files" type="checkbox"' +
-        (showHidden ? ' checked' : '') + '> Show hidden files</label><p id="file-page-status" role="status"></p></div>' +
-        '<div id="file-list"></div><div class="toolbar" id="file-pages"></div>' +
+        '<button type="button" class="subtle fm-collapse" id="fm-collapse">Collapse All</button>' +
+        '<nav id="file-tree" aria-label="Folder tree"></nav><a class="fm-usage" href="#usage">Disk Usage</a></aside>' +
+        '<section class="fm-main" id="drop-files" aria-label="Folder contents">' +
+        '<div class="fm-nav" role="toolbar" aria-label="Folder navigation">' +
+        tool('home', 'Home', 'home') + tool('up', 'Up One Level', 'up') + tool('back', 'Back', 'back') +
+        tool('forward', 'Forward', 'forward') + tool('reload', 'Reload', 'reload') +
+        '<span class="fm-sep" aria-hidden="true"></span>' +
+        tool('selectall', 'Select All', 'selectAll') + tool('selectnone', 'Unselect All', 'selectNone') +
+        '<span class="fm-sep" aria-hidden="true"></span>' +
+        '<a class="fm-btn" href="#trash" title="View Trash">' + fmIcon('trash') + '<span>View Trash</span></a>' +
+        tool('emptytrash', 'Empty Trash', 'emptyTrash') + '</div>' +
+        '<nav class="file-crumbs" id="file-crumbs" aria-label="Current folder"></nav>' +
+        '<div id="file-results" aria-live="polite"></div><div id="file-transfers" aria-live="polite"></div>' +
+        '<div class="fm-drop-hint" aria-hidden="true">Drop files to upload them here</div>' +
+        '<div id="file-list" class="fm-list" tabindex="-1"></div>' +
+        '<div class="fm-status"><p id="file-page-status" role="status"></p><div class="toolbar" id="file-pages"></div></div>' +
         '<section id="file-open" class="file-open" hidden><div class="file-open-head"><h2 id="file-open-title"></h2>' +
-        '<button id="close-file" class="subtle">Close file</button></div><div id="file-preview-content"></div></section></section></div>');
+        '<button id="close-file" class="subtle">Close file</button></div><div id="file-preview-content"></div></section>' +
+        '</section></div></div>');
     const folderForm = $('#file-location');
     const listing = $('#file-list');
     const pages = $('#file-pages');
@@ -270,7 +365,6 @@ async function fileManagerView(epoch) {
     const searchResults = $('#file-results');
     const transferField = $('#file-transfers');
     const input = $('#upload');
-    const search = $('#file-search');
     const drop = $('#drop-files');
 
     function closePreview() {
@@ -289,7 +383,8 @@ async function fileManagerView(epoch) {
     function mountTree() {
         folderTree($('#file-tree'), path, current, showHidden, folder => {
             openFolder(folder).catch(error => notice(error.message));
-        });
+        }, treeExpandTo ?? current);
+        treeExpandTo = null;
     }
 
     async function updateUsage() {
@@ -304,65 +399,153 @@ async function fileManagerView(epoch) {
         }
     }
 
-    function fileOptions(item) {
-        const choices = [];
-        if (item.regular) {
-            choices.push(['download', 'Download'], ['copy', 'Copy'], ['mode', 'Permissions'], ['archive', 'Create ZIP']);
-            if (/\.zip$/i.test(item.name)) choices.push(['extract', 'Extract ZIP']);
-        } else if (item.directory) {
-            choices.push(['copy', 'Copy folder'], ['mode', 'Permissions'], ['archive', 'Create ZIP']);
+    const selection = () => rows.filter(entry => chosen.has(entry.name));
+    const locationOf = entry => joinFilePath(current, entry.name);
+    const isZip = entry => entry.regular && /\.zip$/i.test(entry.name);
+    const isEditable = entry => entry.regular && !isZip(entry) && entry.size <= 1048576 &&
+        !Object.hasOwn(mediaFiles, entry.name.split('.').at(-1).toLowerCase());
+
+    // Enable each command only when the current selection supports it.
+    function updateTools() {
+        const items = selection();
+        const one = items.length === 1 ? items[0] : null;
+        const real = items.length > 0 && items.every(entry => entry.regular || entry.directory);
+        const state = {
+            copy: real, move: items.length > 0, delete: items.length > 0, compress: real,
+            download: Boolean(one?.regular), rename: Boolean(one), edit: Boolean(one && isEditable(one)),
+            view: Boolean(one?.regular), permissions: real, extract: Boolean(one && isZip(one)),
+            up: current !== '', back: past.length > 0, forward: ahead.length > 0,
+            selectall: rows.length > 0 && items.length < rows.length, selectnone: items.length > 0
+        };
+        for (const button of $('#main').querySelectorAll('.fm [data-cmd]')) {
+            if (Object.hasOwn(state, button.dataset.cmd)) button.disabled = !state[button.dataset.cmd];
         }
-        return [...choices, ['rename', 'Move or rename'], ['trash', 'Move to Trash']];
+        const all = $('#fm-check-all');
+        if (all) {
+            all.checked = rows.length > 0 && items.length === rows.length;
+            all.indeterminate = items.length > 0 && items.length < rows.length;
+        }
+        for (const row of listing.querySelectorAll('tr[data-index]')) {
+            const isChosen = chosen.has(rows[Number(row.dataset.index)].name);
+            row.classList.toggle('chosen', isChosen);
+            row.setAttribute('aria-selected', String(isChosen));
+            row.querySelector('input[type=checkbox]').checked = isChosen;
+        }
+        const range = page.total ? (offset + 1) + '–' + (offset + page.entries.length) + ' of ' + page.total + ' items' : 'This folder is empty.';
+        status.textContent = range + (items.length ? ' · ' + items.length + ' selected' : '') +
+            (page.next_offset !== null || offset ? ' · Sorting applies to this page' : '');
+    }
+
+    function sortRows() {
+        const direction = sortAscending ? 1 : -1;
+        const value = {
+            name: entry => entry.name.toLowerCase(), size: entry => entry.regular ? entry.size : -1,
+            modified: entry => entry.modified, type: entry => fileTypeName(entry).toLowerCase(),
+            permissions: entry => entry.mode
+        }[sortKey];
+        rows = [...page.entries].sort((a, b) => {
+            if (a.directory !== b.directory) return a.directory ? -1 : 1;  // Folders stay first.
+            const left = value(a), right = value(b);
+            return (left < right ? -1 : left > right ? 1 : a.name.localeCompare(b.name)) * direction;
+        });
     }
 
     function renderListing() {
         const names = current.split('/').filter(Boolean);
         $('#file-crumbs').innerHTML = ['public_html', ...names].map((label, index) =>
             '<button type="button" class="subtle" data-level="' + index + '"' +
-            (index === names.length ? ' aria-current="page"' : '') + '>' + esc(label) + '</button>').join(' / ');
+            (index === names.length ? ' aria-current="page"' : '') + '>' + esc(label) + '</button>').join('<span aria-hidden="true">/</span>');
         actionHandler($('#file-crumbs'), '[data-level]', async button =>
             openFolder(names.slice(0, Number(button.dataset.level)).join('/')));
         folderForm.elements.folder.value = current;
-        status.textContent = page.total
-            ? (offset + 1) + '–' + (offset + page.entries.length) + ' of ' + page.total + ' entries'
-            : 'This folder has no visible entries.';
-        listing.innerHTML = table(['Name', 'Size', 'Modified', 'Owner / Group', 'Mode', 'Actions'],
-            page.entries.map((entry, index) => {
-                const label = esc(entry.name) + (entry.directory ? '/' : '');
-                const name = entry.regular || entry.directory
-                    ? '<button class="file-name subtle" data-open="' + index + '">' + label + '</button>'
-                    : label + (entry.symlink ? ' (symlink)' : ' (special file)');
-                const options = fileOptions(entry).map(([key, action]) =>
-                    '<option value="' + key + '">' + action + '</option>').join('');
-                return [name, entry.regular ? fileSize(entry.size) : '—',
-                    esc(new Date(entry.modified * 1000).toLocaleString()),
-                    '<span title="UID ' + Number(entry.uid) + ', GID ' + Number(entry.gid) + '">' +
-                    esc(entry.owner) + ' / ' + esc(entry.group) + '</span>', esc(entry.mode.replace(/^0o/, '')),
-                    '<select class="file-actions" data-action="' + index + '" aria-label="Action for ' + esc(entry.name) +
-                    '"><option value="">Choose…</option>' + options + '</select>'];
-            }));
-        actionHandler(listing, '[data-open]', async button => {
-            const entry = page.entries[Number(button.dataset.open)];
-            const location = joinFilePath(current, entry.name);
-            if (entry.directory) await openFolder(location);
-            else await openFile(location, entry.size);
-        });
-        for (const select of listing.querySelectorAll('[data-action]')) {
-            select.onchange = async () => {
-                const entry = page.entries[Number(select.dataset.action)];
-                const action = select.value;
-                select.disabled = true;
-                select.value = '';
-                try { if (action) await fileAction(action, entry); }
-                catch (error) { notice(error.message); }
-                finally { select.disabled = false; }
-            };
-        }
+        sortRows();
+        const columns = [['name', 'Name'], ['size', 'Size'], ['modified', 'Last Modified'], ['type', 'Type'], ['permissions', 'Permissions']];
+        const header = columns.map(([key, label]) => '<th' + (key === sortKey ? ' aria-sort="' + (sortAscending ? 'ascending' : 'descending') + '"' : '') +
+            ' class="fm-col-' + key + '"><button type="button" data-sort="' + key + '">' + label +
+            (key === sortKey ? '<span aria-hidden="true">' + (sortAscending ? ' ▲' : ' ▼') + '</span>' : '') + '</button></th>').join('');
+        const body = rows.length ? rows.map((entry, index) => {
+            const kind = entry.directory ? 'dir' : entry.symlink ? 'link' : 'doc';
+            const name = entry.regular || entry.directory
+                ? '<button type="button" class="fm-open" data-open="' + index + '">' + esc(entry.name) + '</button>'
+                : '<span>' + esc(entry.name) + '</span>';
+            const owner = esc(entry.owner) + ' / ' + esc(entry.group);
+            return '<tr data-index="' + index + '" aria-selected="false"><td class="fm-check"><input type="checkbox" aria-label="Select ' +
+                esc(entry.name) + '"></td><td class="fm-name"><span class="fm-kind fm-' + kind + '">' + fmIcon(kind) + '</span>' + name + '</td>' +
+                '<td class="fm-col-size">' + (entry.regular ? fileSize(entry.size) : entry.directory ? '—' : '') + '</td>' +
+                '<td class="fm-col-modified">' + esc(new Date(entry.modified * 1000).toLocaleString()) + '</td>' +
+                '<td class="fm-col-type">' + esc(fileTypeName(entry)) + '</td>' +
+                '<td class="fm-col-permissions" title="Owner ' + owner + ' (UID ' + Number(entry.uid) + ', GID ' + Number(entry.gid) + ')">' +
+                esc(entry.mode.replace(/^0o/, '').padStart(4, '0')) + '</td>' +
+                (settings.showOwner ? '<td class="fm-col-owner">' + owner + '</td>' : '') + '</tr>';
+        }).join('') : '<tr><td colspan="' + (settings.showOwner ? 7 : 6) + '" class="fm-empty">This folder is empty. Use Upload, File or Folder to add content.</td></tr>';
+        listing.innerHTML = '<table class="fm-table"><thead><tr><th class="fm-check"><input type="checkbox" id="fm-check-all" aria-label="Select all items on this page"></th>' +
+            header + (settings.showOwner ? '<th class="fm-col-owner">Owner / Group</th>' : '') + '</tr></thead><tbody>' + body + '</tbody></table>';
         pages.innerHTML = (offset ? '<button class="subtle" id="file-prev">Previous page</button>' : '') +
             (page.next_offset === null ? '' : '<button class="subtle" id="file-next">Next page</button>');
         actionHandler(pages, '#file-prev', async () => load(current, Math.max(0, offset - 100)));
         actionHandler(pages, '#file-next', async () => load(current, page.next_offset));
+        updateTools();
     }
+
+    listing.addEventListener('click', event => {
+        const sort = event.target.closest('[data-sort]');
+        if (sort) {
+            sortAscending = sort.dataset.sort === sortKey ? !sortAscending : true;
+            sortKey = sort.dataset.sort;
+            renderListing();
+            listing.querySelector('[data-sort="' + sortKey + '"]').focus();
+            return;
+        }
+        if (event.target.id === 'fm-check-all') {
+            if (event.target.checked) rows.forEach(entry => chosen.add(entry.name)); else chosen.clear();
+            updateTools();
+            return;
+        }
+        const open = event.target.closest('[data-open]');
+        if (open) {
+            const entry = rows[Number(open.dataset.open)];
+            (entry.directory ? openFolder(locationOf(entry)) : openFile(locationOf(entry), entry.size)).catch(error => notice(error.message));
+            return;
+        }
+        const row = event.target.closest('tr[data-index]');
+        if (!row) return;
+        const index = Number(row.dataset.index);
+        const name = rows[index].name;
+        if (event.target.matches('input[type=checkbox]')) {
+            if (event.target.checked) chosen.add(name); else chosen.delete(name);
+            anchor = index;
+        } else if (event.shiftKey && anchor !== null) {
+            // Shift-click selects a range; Ctrl/Cmd adds to it.
+            if (!event.ctrlKey && !event.metaKey) chosen.clear();
+            for (let i = Math.min(anchor, index); i <= Math.max(anchor, index); i += 1) chosen.add(rows[i].name);
+        } else if (event.ctrlKey || event.metaKey) {
+            if (chosen.has(name)) chosen.delete(name); else chosen.add(name);
+            anchor = index;
+        } else {
+            chosen.clear();
+            chosen.add(name);
+            anchor = index;
+        }
+        updateTools();
+    });
+    listing.addEventListener('dblclick', event => {
+        const row = event.target.closest('tr[data-index]');
+        if (!row || event.target.closest('button, input')) return;
+        const entry = rows[Number(row.dataset.index)];
+        if (entry.directory) openFolder(locationOf(entry)).catch(error => notice(error.message));
+        else if (entry.regular) openFile(locationOf(entry), entry.size).catch(error => notice(error.message));
+    });
+    listing.addEventListener('keydown', event => {
+        if (event.target.closest('input:not([type=checkbox]), textarea')) return;
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            rows.forEach(entry => chosen.add(entry.name));
+            updateTools();
+        } else if (event.key === 'Delete' && chosen.size) {
+            event.preventDefault();
+            command('delete');
+        }
+    });
 
     async function load(folder, nextOffset = 0) {
         const request = ++browseRequest;
@@ -377,8 +560,11 @@ async function fileManagerView(epoch) {
             offset = nextOffset;
             if (changed) {
                 closePreview();
-                searchResults.replaceChildren();
-                search.reset();
+                chosen.clear();
+                anchor = null;
+            } else {
+                const present = new Set(result.entries.map(entry => entry.name));
+                for (const name of [...chosen]) if (!present.has(name)) chosen.delete(name);
             }
             renderListing();
             return true;
@@ -388,9 +574,20 @@ async function fileManagerView(epoch) {
         }
     }
 
-    async function openFolder(folder) {
+    // how: 'new' records history; 'back' and 'forward' move through it.
+    async function openFolder(folder, how = 'new') {
+        folder = String(folder).split('/').filter(Boolean).join('/');
         if (folder !== current && !await checkChanges()) return;
-        if (active() && await load(folder)) mountTree();
+        const previous = current;
+        if (!active() || !await load(folder)) return;
+        if (current !== previous) {
+            if (how === 'new') { past.push(previous); ahead.length = 0; }
+            else if (how === 'back') { past.pop(); ahead.push(previous); }
+            else { ahead.pop(); past.push(previous); }
+            if (past.length > 50) past.shift();
+        }
+        mountTree();
+        updateTools();
     }
 
     async function refresh() {
@@ -404,6 +601,21 @@ async function fileManagerView(epoch) {
         const result = await filePath(path, action, fields);
         notice(result.message);
         await refresh();
+    }
+
+    // Apply one operation to several items, then report successes and failures together.
+    async function runEach(items, label, operation) {
+        const failed = [];
+        for (const entry of items) {
+            if (!active()) break;
+            try { await operation(entry); }
+            catch (error) { failed.push(entry.name + ': ' + error.message); }
+        }
+        const done = items.length - failed.length;
+        notice(label + ' ' + done + ' of ' + items.length + (items.length === 1 ? ' item.' : ' items.') +
+            (failed.length ? ' ' + failed.slice(0, 3).join(' ') + (failed.length > 3 ? ' …' : '') : ''));
+        await refresh();
+        if (failed.length) throw Error(failed.length + ' item' + (failed.length === 1 ? '' : 's') + ' could not be processed. ' + failed[0]);
     }
 
     async function previewZip(location, stillOpen) {
@@ -430,6 +642,7 @@ async function fileManagerView(epoch) {
         popup.hidden = false;
         $('#file-open-title').textContent = location;
         content.textContent = 'Opening file…';
+        popup.scrollIntoView({block: 'nearest'});
         const extension = location.split('.').at(-1).toLowerCase();
         const media = Object.hasOwn(mediaFiles, extension) ? mediaFiles[extension] : null;
         try {
@@ -479,46 +692,151 @@ async function fileManagerView(epoch) {
         }
     }
 
-    async function fileAction(action, entry) {
-        const location = joinFilePath(current, entry.name);
-        const moveTarget = (title, folder, name, submit, operation) =>
-            chooseFileTarget(path, title, folder, name, submit, async destination => {
-                await runFileAction(operation, {path: location, destination});
-                if (location === selected && operation === 'rename') closePreview();
-            });
-        if (action === 'download') {
-            if (downloading) throw Error('Wait for the current download to finish.');
-            downloading = true;
-            try {
-                const chunks = await readLargeFile(path, 'download', location, {maxBytes: fileTransferLimit, active,
-                    progress: (done, total) => { status.textContent = 'Downloading ' + fileSize(done) + ' of ' + fileSize(total); }});
-                if (active()) {
-                    downloadBlob(new Blob(chunks, {type: 'application/octet-stream'}), entry.name);
-                    status.textContent = 'Download ready.';
-                }
-            } catch (error) {
-                status.textContent = error.message;
-            } finally {
-                downloading = false;
+    async function download(entry) {
+        if (downloading) throw Error('Wait for the current download to finish.');
+        downloading = true;
+        try {
+            const chunks = await readLargeFile(path, 'download', locationOf(entry), {maxBytes: fileTransferLimit, active,
+                progress: (done, total) => { status.textContent = 'Downloading ' + fileSize(done) + ' of ' + fileSize(total); }});
+            if (active()) {
+                downloadBlob(new Blob(chunks, {type: 'application/octet-stream'}), entry.name);
+                status.textContent = 'Download ready.';
             }
-        } else if (action === 'mode') {
-            editFileMode(entry, mode => runFileAction('chmod', {path: location, mode}));
-        } else if (action === 'trash') {
-            if (!await confirmed('Move ' + entry.name + ' to Trash?')) return;
-            if (location === selected && !await checkChanges()) return;
-            await runFileAction('trash', {path: location});
-            if (location === selected) closePreview();
-        } else if (action === 'copy') {
-            moveTarget('Copy ' + entry.name, current, entry.name + '.copy', 'Copy', entry.directory ? 'copy_tree' : 'copy');
-        } else if (action === 'rename') {
-            if (location === selected && !await checkChanges()) return;
-            moveTarget('Move or rename ' + entry.name, current, entry.name, 'Move', 'rename');
-        } else if (action === 'extract') {
-            moveTarget('Extract ' + entry.name, current, entry.name.replace(/\.zip$/i, ''), 'Extract', 'extract');
-        } else if (action === 'archive') {
-            moveTarget('Create ZIP of ' + entry.name, current, entry.name + '.zip', 'Create ZIP', 'archive');
+        } finally {
+            downloading = false;
         }
     }
+
+    function renameDialog(entry) {
+        const location = locationOf(entry);
+        fileDialog('Rename ' + entry.name, '<label>New name<input name="filename" required maxlength="255" value="' +
+            esc(entry.name) + '"></label>', 'Rename', async fields => {
+            await runFileAction('rename', {path: location, destination: joinFilePath(current, validateFileName(fields.filename))});
+            if (location === selected) closePreview();
+        });
+    }
+
+    function settingsDialog() {
+        const form = fileDialog('File Manager settings',
+            '<label class="file-check"><input type="checkbox" name="hidden"' + (showHidden ? ' checked' : '') + '> Show hidden files</label>' +
+            '<p class="muted">Names that start with a dot, such as .htaccess, are hidden by default.</p>' +
+            '<label class="file-check"><input type="checkbox" name="owner"' + (settings.showOwner ? ' checked' : '') + '> Show owner and group column</label>',
+            'Save settings', async fields => {
+                showHidden = fields.hidden === 'on';
+                settings.showOwner = fields.owner === 'on';
+                try { localStorage.setItem(fileSettingsKey, JSON.stringify({showHidden, showOwner: settings.showOwner})); } catch { /* Per-browser only. */ }
+                if (await load(current, offset)) mountTree();
+            });
+        form.querySelector('input').focus();
+    }
+
+    async function emptyTrash() {
+        const items = await filePath(path, 'trash_list');
+        if (!items.length) { notice('Trash is already empty.'); return; }
+        if (!await confirmed('Permanently delete all ' + items.length + ' item' + (items.length === 1 ? '' : 's') +
+            ' in Trash? This cannot be undone.')) return;
+        let removed = 0;
+        for (const item of items) {
+            if (!active()) break;
+            try { await filePath(path, 'trash_purge', {id: item.id}); removed += 1; }
+            catch (error) { notice(error.message); }
+        }
+        notice('Permanently deleted ' + removed + ' of ' + items.length + ' Trash items.');
+    }
+
+    async function command(cmd) {
+        const items = selection();
+        const one = items[0];
+        if (cmd === 'newfile') {
+            chooseFileTarget(path, 'New file', current, '', 'Open editor', destination => openFile(destination, 0, true));
+        } else if (cmd === 'newfolder') {
+            chooseFileTarget(path, 'New folder', current, '', 'Create folder', destination => runFileAction('mkdir', {path: destination}));
+        } else if (cmd === 'upload') {
+            input.click();
+        } else if (cmd === 'copy') {
+            if (items.length === 1) {
+                chooseFileTarget(path, 'Copy ' + one.name, current, one.name + '.copy', 'Copy',
+                    destination => runFileAction(one.directory ? 'copy_tree' : 'copy', {path: locationOf(one), destination}));
+            } else {
+                chooseFileTarget(path, 'Copy ' + items.length + ' items', current, null, 'Copy', folder =>
+                    runEach(items, 'Copied', entry => filePath(path, entry.directory ? 'copy_tree' : 'copy',
+                        {path: locationOf(entry), destination: joinFilePath(folder, entry.name)})));
+            }
+        } else if (cmd === 'move') {
+            if (selected && items.some(entry => locationOf(entry) === selected) && !await checkChanges()) return;
+            if (items.length === 1) {
+                chooseFileTarget(path, 'Move ' + one.name, current, one.name, 'Move', async destination => {
+                    await runFileAction('rename', {path: locationOf(one), destination});
+                    if (locationOf(one) === selected) closePreview();
+                });
+            } else {
+                chooseFileTarget(path, 'Move ' + items.length + ' items', current, null, 'Move', async folder => {
+                    if (items.some(entry => locationOf(entry) === selected)) closePreview();
+                    await runEach(items, 'Moved', entry => filePath(path, 'rename',
+                        {path: locationOf(entry), destination: joinFilePath(folder, entry.name)}));
+                });
+            }
+        } else if (cmd === 'download') {
+            await download(one);
+        } else if (cmd === 'delete') {
+            const what = items.length === 1 ? one.name : items.length + ' items';
+            if (!await confirmed('Move ' + what + ' to Trash? You can restore items from View Trash.')) return;
+            if (selected && items.some(entry => locationOf(entry) === selected)) {
+                if (!await checkChanges()) return;
+                closePreview();
+            }
+            await runEach(items, 'Moved to Trash', entry => filePath(path, 'trash', {path: locationOf(entry)}));
+        } else if (cmd === 'rename') {
+            if (locationOf(one) === selected && !await checkChanges()) return;
+            renameDialog(one);
+        } else if (cmd === 'edit' || cmd === 'view') {
+            await openFile(locationOf(one), one.size);
+        } else if (cmd === 'permissions') {
+            const label = items.length === 1 ? one : {...one, name: items.length + ' items'};
+            editFileMode(label, mode => runEach(items, 'Updated permissions for', entry =>
+                filePath(path, 'chmod', {path: locationOf(entry), mode})));
+        } else if (cmd === 'extract') {
+            chooseFileTarget(path, 'Extract ' + one.name, current, one.name.replace(/\.zip$/i, ''), 'Extract',
+                destination => runFileAction('extract', {path: locationOf(one), destination}));
+        } else if (cmd === 'compress') {
+            const suggested = items.length === 1 ? one.name + '.zip' : (leafFileName(current) || 'website') + '-files.zip';
+            chooseFileTarget(path, 'Compress ' + (items.length === 1 ? one.name : items.length + ' items'), current, suggested,
+                'Create ZIP', destination => runFileAction('archive', {path: current, names: items.map(entry => entry.name), destination}));
+        } else if (cmd === 'home') {
+            await openFolder('');
+        } else if (cmd === 'up') {
+            await openFolder(parentFilePath(current));
+        } else if (cmd === 'back') {
+            if (past.length) await openFolder(past.at(-1), 'back');
+        } else if (cmd === 'forward') {
+            if (ahead.length) await openFolder(ahead.at(-1), 'forward');
+        } else if (cmd === 'reload') {
+            await refresh();
+        } else if (cmd === 'selectall') {
+            rows.forEach(entry => chosen.add(entry.name));
+            updateTools();
+        } else if (cmd === 'selectnone') {
+            chosen.clear();
+            updateTools();
+        } else if (cmd === 'emptytrash') {
+            await emptyTrash();
+        } else if (cmd === 'settings') {
+            settingsDialog();
+        }
+    }
+
+    $('#main').querySelector('.fm').addEventListener('click', async event => {
+        const button = event.target.closest('button[data-cmd]');
+        if (!button || button.disabled) return;
+        event.preventDefault();
+        button.disabled = true;
+        try { await command(button.dataset.cmd); }
+        catch (error) { notice(error.message); }
+        finally {
+            button.disabled = false;
+            if (active()) updateTools();
+        }
+    });
 
     async function upload(files) {
         if (!files.length) return;
@@ -535,7 +853,7 @@ async function fileManagerView(epoch) {
         cancel.textContent = 'Cancel uploads';
         cancel.onclick = () => thisBatch.abort();
         transferField.replaceChildren(cancel, list);
-        const rows = files.map(file => {
+        const rowsShown = files.map(file => {
             const item = document.createElement('li');
             item.textContent = file.name + ' · Waiting';
             list.append(item);
@@ -543,7 +861,7 @@ async function fileManagerView(epoch) {
         });
         try {
             for (const [index, file] of files.entries()) {
-                const row = rows[index];
+                const row = rowsShown[index];
                 if (!stillUploading()) {
                     row.textContent = file.name + ' · Canceled';
                     continue;
@@ -569,37 +887,31 @@ async function fileManagerView(epoch) {
         event.preventDefault();
         openFolder(folderForm.elements.folder.value).catch(error => notice(error.message));
     };
-    $('#hidden-files').onchange = async event => {
-        showHidden = event.target.checked;
-        searchResults.replaceChildren();
-        if (await load(current)) mountTree();
+    $('#fm-collapse').onclick = () => {
+        treeExpandTo = '';
+        mountTree();
     };
-    actionHandler($('#main'), '#reload-files', refresh);
     actionHandler($('#main'), '#close-file', async () => { if (await checkChanges()) closePreview(); });
-    actionHandler($('#main'), '#new-file', async () =>
-        chooseFileTarget(path, 'New file', current, '', 'Open editor', destination => openFile(destination, 0, true)));
-    actionHandler($('#main'), '#new-dir', async () =>
-        chooseFileTarget(path, 'New folder', current, '', 'Create folder', destination => runFileAction('mkdir', {path: destination})));
-    actionHandler($('#main'), '#archive-folder', async () =>
-        chooseFileTarget(path, 'Zip current folder', parentFilePath(current), (leafFileName(current) || 'website') + '.zip',
-            'Create ZIP', destination => runFileAction('archive', {path: current, destination})));
-    form('#file-search', async (fields, element) => {
-        const start = current;
+    form('#file-search', async fields => {
+        const start = fields.scope === 'current' ? current : '';
         const hidden = showHidden;
         searchResults.textContent = 'Searching…';
         try {
             const found = await filePath(path, 'search', {path: start, query: fields.query, include_hidden: hidden});
-            if (!active() || current !== start || showHidden !== hidden) return;
-            searchResults.innerHTML = table(['Matching path', ''], found.matches.map((item, index) => [
-                esc(item.path), item.symlink ? 'Symlink' : '<button class="subtle" data-result="' + index + '">Open</button>'
-            ])) + (found.truncated ? '<p>Search reached its scanning or display limit.</p>' : '');
+            if (!active() || showHidden !== hidden) return;
+            searchResults.innerHTML = '<div class="fm-results-head"><h2>Search results for “' + esc(fields.query) + '” in ' +
+                esc(start ? 'public_html/' + start : 'all your files') + '</h2><button type="button" class="subtle" data-close-results>Close results</button></div>' +
+                table(['Matching path', ''], found.matches.map((item, index) => [
+                    esc(item.path), item.symlink ? 'Symlink' : '<button class="subtle" data-result="' + index + '">' + (item.directory ? 'Open folder' : 'Open') + '</button>'
+                ])) + (found.truncated ? '<p>Search reached its scanning or display limit.</p>' : '');
             actionHandler(searchResults, '[data-result]', async button => {
                 const item = found.matches[Number(button.dataset.result)];
                 if (item.directory) await openFolder(item.path);
                 else await openFile(item.path);
             });
+            actionHandler(searchResults, '[data-close-results]', async () => searchResults.replaceChildren());
         } catch (error) {
-            if (element.isConnected && current === start) searchResults.textContent = error.message;
+            if (active()) searchResults.textContent = error.message;
         }
     });
     input.onchange = () => {
@@ -607,8 +919,12 @@ async function fileManagerView(epoch) {
         input.value = '';
         upload(files).catch(error => notice(error.message));
     };
-    drop.ondragover = event => { event.preventDefault(); drop.classList.add('dropping'); };
-    drop.ondragleave = () => drop.classList.remove('dropping');
+    drop.ondragover = event => {
+        if (![...(event.dataTransfer?.types || [])].includes('Files')) return;
+        event.preventDefault();
+        drop.classList.add('dropping');
+    };
+    drop.ondragleave = event => { if (!drop.contains(event.relatedTarget)) drop.classList.remove('dropping'); };
     drop.ondrop = event => {
         event.preventDefault();
         drop.classList.remove('dropping');

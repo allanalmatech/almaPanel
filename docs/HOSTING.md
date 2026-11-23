@@ -117,30 +117,54 @@ secondary synchronization and DNSSEC remain separate work.
 
 ## Working with website files
 
-Select your hosting account and open **File Manager**. Expand folders in the
-tree, click a folder in the current path, or enter a folder path relative to
-`public_html`. Search scans the current folder and its subfolders by name.
-**Show hidden files** applies to browsing and search. The list shows size,
-modified time, Linux owner and group, and Unix permissions.
+Select your hosting account and open **File Manager**. The screen has:
 
-- Choose **New file** to open the source editor, or **New folder** to create a
-  directory. Click an existing text file to edit it. Select a highlighting
+- a search bar: choose **All your files** or **Current folder**, enter part
+  of a name after **for**, and press **Go**;
+- an action toolbar: **File**, **Folder**, **Copy**, **Move**, **Upload**,
+  **Download**, **Delete**, **Rename**, **Edit**, **Permissions**, **View**,
+  **Extract** and **Compress**. Each action is enabled only when the selection
+  supports it;
+- a folder panel with a path box, a home button, **Collapse All** and the
+  folder tree;
+- a navigation bar: **Home**, **Up One Level**, **Back**, **Forward**,
+  **Reload**, **Select All**, **Unselect All**, **View Trash** and
+  **Empty Trash**;
+- the file list with Name, Size, Last Modified, Type and Permissions. Click a
+  column heading to sort; folders stay first, and sorting applies to the
+  100-entry page shown.
+
+Click a row to select it, Ctrl-click (Cmd-click on macOS) to add or remove
+rows, and Shift-click to select a range. You can also tick the row
+checkboxes. Double-click a row, or click its name, to open a folder or file.
+In the list, Ctrl+A selects all and Delete moves the selection to Trash.
+**Settings** controls **Show hidden files** and an owner and group column;
+the browser remembers these choices.
+
+- Choose **File** to open the source editor for a new file, or **Folder** to
+  create a directory. Select a text file and choose **Edit**. Select a highlighting
   language and press **Save file** or use Ctrl+S (Cmd+S on macOS). A concurrent
   saved change causes a revision conflict. Copy your unsaved text before
   reopening the current file.
 - Drop files on the upload area or choose up to 50 at once. Watch progress
   per file. A file appears at its destination after the full upload succeeds.
   **Download** reconstructs the requested file from chunks of the same revision.
-- Use the row's **Actions** to copy, move, rename, change permissions, create
-  a ZIP or send an entry to Trash. The destination dialog can browse folders
-  and set a new name. Copy, move, upload and restore require an unused path.
+- Select one or more entries for **Copy**, **Move**, **Delete**,
+  **Permissions** or **Compress**. With one entry, the destination dialog
+  can browse folders and set a new name. With several, choose the
+  destination folder and each entry keeps its name. The panel reports how
+  many succeeded and names any that failed. **Rename** and **Download** work
+  on one entry. Copy, move, upload and restore require an unused path.
   Permission edits apply the ordinary owner/group/other bits. Check that
   Nginx can still enter the parent folders and read files you want to serve.
-- Click a ZIP to list its files, or choose **Extract ZIP** to unpack it to a new
-  folder. **Zip folder** compresses the displayed folder. The row's
-  **Create ZIP** supports a single file or folder.
-- Open **Trash** to restore an entry to its original or another unused path,
-  or confirm permanent deletion. Trash remains private to the hosting account.
+- Click a ZIP to list its files, or select it and choose **Extract** to unpack
+  it to a new folder. **Compress** puts every selected file and folder into one
+  ZIP. To compress a whole folder, select it in its parent folder, or open it and
+  choose **Select All**.
+- **Delete** moves entries to Trash. Use **View Trash** to restore an entry to its
+  original or another unused path, or to delete one permanently. **Empty Trash**
+  permanently deletes everything in Trash after a confirmation. Trash remains
+  private to the hosting account.
 - Click PNG, JPEG, GIF or WebP to preview it. Use the width, height and output
   format controls to save a resized copy as PNG, JPEG or WebP. Animated GIF
   conversion saves a still image. Supported audio and video files open with

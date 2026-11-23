@@ -34,6 +34,16 @@ Since alpha.11 it also checks compact navigation:
 - Desktop collapse to an icon rail, persisted across a reload.
 - The mobile drawer at 390 pixels: focus moves into it, Tab stays inside, Escape returns focus to the menu button, and the backdrop, close button and link navigation close it.
 
+Since alpha.12 the File Manager section also covers:
+
+- Toolbar enablement for no selection, one file, a ZIP, an image and several entries.
+- Selection by checkbox, click, Ctrl-click, Select All and Unselect All.
+- Column sorting, and Back, Forward, Up One Level and double-click navigation.
+- The settings dialog for hidden files and searches scoped to all files.
+- Single-entry copy, move, rename, permissions, extract and view.
+- A multi-entry ZIP checked member by member, multi-entry deletion to Trash,
+  restoring from View Trash, and Empty Trash.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

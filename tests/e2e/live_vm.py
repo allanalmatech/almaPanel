@@ -8,6 +8,7 @@ import base64
 import http.cookiejar
 import json
 import os
+import pwd
 from pathlib import Path
 import secrets
 import ssl
@@ -15,6 +16,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+import zipfile
 if os.environ.get('ALMA_DISPOSABLE_VM')!='YES' or os.geteuid()!=0:
     raise SystemExit('Requires root and ALMA_DISPOSABLE_VM=YES on a disposable VM.')
 base='https://localhost:8443'
@@ -108,7 +110,12 @@ call(files, {'action': 'trash', 'path': 'probe/probe.txt'})
 trashed = next(entry for entry in call(files, {'action': 'trash_list'}) if entry['path'] == 'probe/probe.txt')
 call(files, {'action': 'trash_restore', 'id': trashed['id'], 'destination': 'next/restored.txt'})
 assert Path('/srv/almapanel/accounts/vmtenant/public_html/next/restored.txt').read_bytes() == data
-print('Live file manager acceptance passed for multi-chunk upload, tenant ownership, Nginx access, ZIP and Trash.')
+call(files, {'action': 'archive', 'path': 'next', 'names': ['probe.txt', 'restored.txt'], 'destination': 'selection.zip'})
+selection = Path('/srv/almapanel/accounts/vmtenant/public_html/selection.zip')
+assert selection.stat().st_uid == pwd.getpwnam('ap_vmtenant').pw_uid
+with zipfile.ZipFile(selection) as archive:
+    assert sorted(archive.namelist()) == ['probe.txt', 'restored.txt']
+print('Live file manager acceptance passed for multi-chunk upload, tenant ownership, Nginx access, ZIP, multi-entry ZIP and Trash.')
 database_probes = []
 for engine in call(account_url + '/databases')['engines']:
     fields = {'action':'create','engine':engine,'label':'probe'+engine}

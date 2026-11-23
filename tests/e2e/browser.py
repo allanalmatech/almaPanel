@@ -15,6 +15,7 @@ import tempfile
 import threading
 from unittest.mock import patch
 import wave
+import zipfile
 import zlib
 import struct
 from wsgiref.simple_server import make_server,WSGIRequestHandler
@@ -151,14 +152,42 @@ with tempfile.TemporaryDirectory() as temp:
             (website / '.settings').write_text('visible when requested')
             page.locator('#nav a[href="#files"]').click()
             page.get_by_text('used in this account', exact=False).wait_for()
-            page.get_by_role('checkbox', name='Show hidden files').check()
+            actions = page.get_by_role('toolbar', name='File actions')
+            folder_nav = page.get_by_role('toolbar', name='Folder navigation')
+            crumbs_now = page.locator('#file-crumbs [aria-current=page]')
+
+            def act(name):
+                actions.get_by_role('button', name=name, exact=True).click()
+
+            def enabled(name):
+                return actions.get_by_role('button', name=name, exact=True).is_enabled()
+
+            def row(name):
+                return page.locator('#file-list tbody tr').filter(has=page.get_by_role('button', name=name, exact=True))
+
+            def select_only(name, **click):
+                # A plain click on a row selects only that item; Ctrl adds to the selection.
+                row(name).locator('.fm-col-size').click(**click)
+
+            # With nothing selected, only the creation tools are available.
+            assert enabled('New file') and enabled('New folder') and enabled('Upload')
+            assert not any(enabled(name) for name in ('Copy', 'Move', 'Download', 'Delete', 'Rename', 'Edit',
+                                                       'Permissions', 'View', 'Extract', 'Compress'))
+            settings_dialog = page.get_by_role('dialog', name='File Manager settings')
+            page.get_by_role('button', name='Settings', exact=True).click()
+            settings_dialog.get_by_role('checkbox', name='Show hidden files').check()
+            settings_dialog.get_by_role('button', name='Save settings').click()
             page.get_by_role('button', name='.settings', exact=True).wait_for()
-            page.get_by_role('checkbox', name='Show hidden files').uncheck()
+            page.get_by_role('button', name='Settings', exact=True).click()
+            settings_dialog.get_by_role('checkbox', name='Show hidden files').uncheck()
+            settings_dialog.get_by_role('button', name='Save settings').click()
             page.get_by_role('button', name='.settings', exact=True).wait_for(state='hidden')
             tree = page.get_by_role('navigation', name='Folder tree')
             tree.get_by_role('button', name='Expand assets', exact=True).click()
             tree.get_by_role('button', name='icons', exact=True).click()
             page.get_by_role('navigation', name='Current folder').get_by_role('button', name='icons').wait_for()
+            assert folder_nav.get_by_role('button', name='Back').is_enabled()
+            assert not folder_nav.get_by_role('button', name='Forward').is_enabled()
 
             big_file = b'a' * 520000 + b'b' * 600000
             php = b'\xef\xbb\xbf<?php\r\necho "before";\r\n'
@@ -169,8 +198,11 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('file.php · Uploaded', exact=True).wait_for()
             folder = website / 'assets' / 'icons'
             assert (folder / 'large.bin').read_bytes() == big_file
+            row('large.bin').wait_for()
+            select_only('large.bin')
+            assert enabled('Download') and enabled('Rename') and not enabled('Edit') and not enabled('Extract')
             with page.expect_download() as download:
-                page.get_by_role('combobox', name='Action for large.bin').select_option('download')
+                act('Download')
             assert download.value.path().read_bytes() == big_file
             dropped = page.evaluate_handle('''() => {
                 const transfer = new DataTransfer();
@@ -181,14 +213,15 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('drop.txt · Uploaded', exact=True).wait_for()
             assert (folder / 'drop.txt').read_text() == 'dropped'
 
-            page.get_by_role('button', name='file.php', exact=True).click()
+            select_only('file.php')
+            act('Edit')
             page.locator('.source-editor .code-keyword').filter(has_text='echo').wait_for()
             page.get_by_role('textbox', name='File contents').fill('<?php\necho "after";\n')
             page.get_by_role('button', name='Save file', exact=True).click()
             page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
             assert (folder / 'file.php').read_bytes() == php.replace(b'before', b'after')
             page.get_by_role('button', name='Close file', exact=True).click()
-            page.get_by_role('button', name='New file', exact=True).click()
+            act('New file')
             dialog = page.get_by_role('dialog', name='New file', exact=True)
             dialog.get_by_role('textbox', name='Name', exact=True).fill('created.txt')
             dialog.get_by_role('button', name='Open editor', exact=True).click()
@@ -197,42 +230,93 @@ with tempfile.TemporaryDirectory() as temp:
             page.locator('[data-editor-status]').get_by_text('File saved.', exact=True).wait_for()
             assert (folder / 'created.txt').read_text() == 'created by File Manager'
             page.get_by_role('button', name='Close file', exact=True).click()
+
+            # Sorting by column header; folders stay first.
+            page.locator('#file-list th').get_by_role('button', name='Name').click()
+            page.locator('#file-list th[aria-sort=descending]').wait_for()
+            names = page.locator('#file-list .fm-open').all_inner_texts()
+            assert names == sorted(names, key=str.lower, reverse=True), names
+            page.locator('#file-list th').get_by_role('button', name='Name').click()
+            page.locator('#file-list th[aria-sort=ascending]').wait_for()
+
             page.get_by_role('navigation', name='Current folder').get_by_role('button', name='public_html').click()
-            page.locator('#file-crumbs [aria-current=page]').get_by_text('public_html', exact=True).wait_for()
-            page.get_by_role('searchbox', name='Search this folder and its subfolders').fill('created')
-            page.get_by_role('button', name='Search', exact=True).click()
+            crumbs_now.get_by_text('public_html', exact=True).wait_for()
+            page.get_by_role('searchbox', name='Search files').fill('created')
+            page.locator('#file-search').get_by_role('button', name='Go', exact=True).click()
             page.get_by_role('cell', name='assets/icons/created.txt', exact=True).wait_for()
+            page.get_by_role('button', name='Close results').click()
             page.get_by_role('textbox', name='Folder path').fill('assets/icons')
-            page.get_by_role('button', name='Go', exact=True).click()
-            page.get_by_role('combobox', name='Action for file.php').select_option('mode')
+            page.locator('#file-location').get_by_role('button', name='Go', exact=True).click()
+            crumbs_now.get_by_text('icons', exact=True).wait_for()
+            folder_nav.get_by_role('button', name='Back').click()
+            crumbs_now.get_by_text('public_html', exact=True).wait_for()
+            folder_nav.get_by_role('button', name='Forward').click()
+            crumbs_now.get_by_text('icons', exact=True).wait_for()
+            folder_nav.get_by_role('button', name='Up One Level').click()
+            crumbs_now.get_by_text('assets', exact=True).wait_for()
+            row('icons').dblclick(position={'x': 5, 'y': 5})
+            crumbs_now.get_by_text('icons', exact=True).wait_for()
+
+            select_only('file.php')
+            act('Permissions')
             page.get_by_role('group', name='Owner').get_by_role('checkbox', name='Execute').check()
             page.get_by_role('button', name='Save permissions', exact=True).click()
             page.get_by_role('dialog', name='Change permissions').wait_for(state='hidden')
             assert (folder / 'file.php').stat().st_mode & 0o100
 
-            page.get_by_role('combobox', name='Action for file.php').select_option('copy')
+            select_only('file.php')
+            act('Copy')
             dialog = page.get_by_role('dialog', name='Copy file.php')
             dialog.get_by_role('textbox', name='Name', exact=True).fill('copied.php')
             dialog.get_by_role('button', name='Copy', exact=True).click()
-            page.get_by_role('combobox', name='Action for copied.php').select_option('rename')
-            dialog = page.get_by_role('dialog', name='Move or rename copied.php')
+            dialog.wait_for(state='hidden')
+            select_only('copied.php')
+            act('Move')
+            dialog = page.get_by_role('dialog', name='Move copied.php')
             dialog.get_by_text('Browse folders', exact=True).click()
             dialog.get_by_role('button', name='public_html', exact=True).click()
             dialog.get_by_role('textbox', name='Name', exact=True).fill('moved.php')
             dialog.get_by_role('button', name='Move', exact=True).click()
             dialog.wait_for(state='hidden')
             assert (website / 'moved.php').is_file() and not (folder / 'copied.php').exists()
+            select_only('drop.txt')
+            act('Rename')
+            dialog = page.get_by_role('dialog', name='Rename drop.txt')
+            dialog.get_by_role('textbox', name='New name').fill('dropped.txt')
+            dialog.get_by_role('button', name='Rename', exact=True).click()
+            dialog.wait_for(state='hidden')
+            assert (folder / 'dropped.txt').read_text() == 'dropped' and not (folder / 'drop.txt').exists()
 
-            page.get_by_role('combobox', name='Action for file.php').select_option('archive')
-            page.get_by_role('dialog').get_by_role('button', name='Create ZIP', exact=True).click()
+            select_only('file.php')
+            act('Compress')
+            page.get_by_role('dialog', name='Compress file.php').get_by_role('button', name='Create ZIP', exact=True).click()
             page.get_by_role('button', name='file.php.zip', exact=True).click()
             page.get_by_text('1 file in this ZIP', exact=True).wait_for()
-            page.get_by_role('combobox', name='Action for file.php.zip').select_option('extract')
+            select_only('file.php.zip')
+            act('Extract')
             dialog = page.get_by_role('dialog', name='Extract file.php.zip')
             dialog.get_by_role('textbox', name='Name', exact=True).fill('unpacked')
             dialog.get_by_role('button', name='Extract', exact=True).click()
             dialog.wait_for(state='hidden')
             assert (folder / 'unpacked' / 'file.php').read_bytes() == (folder / 'file.php').read_bytes()
+
+            # Several items: Ctrl-click, then compress them into one ZIP.
+            select_only('created.txt')
+            select_only('unpacked', modifiers=['Control'])
+            page.locator('#file-page-status').get_by_text('2 selected', exact=False).wait_for()
+            assert not enabled('Rename') and not enabled('Download') and enabled('Compress') and enabled('Copy')
+            qa_shot('file-manager-selection')
+            act('Compress')
+            dialog = page.get_by_role('dialog', name='Compress 2 items')
+            dialog.get_by_role('textbox', name='Name', exact=True).fill('pair.zip')
+            dialog.get_by_role('button', name='Create ZIP', exact=True).click()
+            dialog.wait_for(state='hidden')
+            with zipfile.ZipFile(folder / 'pair.zip') as archive:
+                assert sorted(archive.namelist()) == ['created.txt', 'unpacked/', 'unpacked/file.php']
+            folder_nav.get_by_role('button', name='Select All', exact=True).click()
+            assert page.locator('#file-list tbody tr.chosen').count() == page.locator('#file-list tbody tr').count()
+            folder_nav.get_by_role('button', name='Unselect All').click()
+            assert page.locator('#file-list tbody tr.chosen').count() == 0
 
             def png_chunk(kind, data):
                 return struct.pack('!I', len(data)) + kind + data + struct.pack('!I', zlib.crc32(kind + data))
@@ -245,8 +329,10 @@ with tempfile.TemporaryDirectory() as temp:
                 wav.setparams((1, 1, 8000, 0, 'NONE', 'not compressed'))
                 wav.writeframes(bytes([128]) * 800)
             (folder / 'tone.wav').write_bytes(audio.getvalue())
-            page.get_by_role('button', name='Reload', exact=True).click()
-            page.get_by_role('button', name='photo.png', exact=True).click()
+            folder_nav.get_by_role('button', name='Reload', exact=True).click()
+            select_only('photo.png')
+            assert enabled('View') and not enabled('Edit')
+            act('View')
             page.get_by_role('spinbutton', name='Width (pixels)').fill('3')
             page.get_by_role('combobox', name='Output format').select_option('webp')
             page.get_by_role('button', name='Save image copy', exact=True).click()
@@ -256,17 +342,30 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='tone.wav', exact=True).click()
             page.wait_for_function("() => document.querySelector('audio')?.readyState >= 1")
 
-            page.get_by_role('combobox', name='Action for drop.txt').select_option('trash')
+            # Delete several items to Trash, restore one, then empty Trash.
+            folder_nav.get_by_role('button', name='Unselect All').click()
+            page.get_by_role('checkbox', name='Select dropped.txt').check()
+            page.get_by_role('checkbox', name='Select pair.zip').check()
+            act('Delete')
             page.get_by_role('button', name='Confirm', exact=True).click()
-            page.get_by_role('button', name='drop.txt', exact=True).wait_for(state='hidden')
-            page.get_by_role('link', name='Trash', exact=True).click()
-            page.get_by_role('button', name='Restore', exact=True).click()
+            page.get_by_role('button', name='dropped.txt', exact=True).wait_for(state='hidden')
+            page.get_by_role('button', name='pair.zip', exact=True).wait_for(state='hidden')
+            folder_nav.get_by_role('link', name='View Trash').click()
+            page.get_by_role('row').filter(has_text='dropped.txt').get_by_role('button', name='Restore', exact=True).click()
             page.get_by_role('button', name='Restore entry', exact=True).click()
             page.get_by_text('Entry restored.', exact=True).wait_for()
-            assert (folder / 'drop.txt').read_text() == 'dropped'
+            assert (folder / 'dropped.txt').read_text() == 'dropped'
+            page.locator('#nav a[href="#files"]').click()
+            folder_nav.get_by_role('button', name='Empty Trash').click()
+            page.get_by_text('Permanently delete all 1 item in Trash?', exact=False).wait_for()
+            page.get_by_role('button', name='Confirm', exact=True).click()
+            page.get_by_text('Permanently deleted 1 of 1 Trash items.', exact=True).wait_for()
+            assert not any((private / 'trash').iterdir())
             page.set_viewport_size({'width': 412, 'height': 860})
             page.evaluate("() => { location.hash = 'files'; }")
             page.get_by_role('heading', name='File Manager', exact=True).wait_for()
+            page.locator('#file-list tbody tr').first.wait_for()
+            qa_shot('file-manager-mobile')
             assert page.evaluate('() => document.documentElement.scrollWidth === document.documentElement.clientWidth')
             page.set_viewport_size({'width': 1440, 'height': 1000})
             file_fixture.stop()

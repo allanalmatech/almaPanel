@@ -348,6 +348,7 @@ accessible to the signed-in user. POST requests use the session and CSRF token.
 | `copy`, `copy_tree`, `rename` | `path`, `destination` | Copy or move to an unused path. |
 | `chmod` | `path`, `mode` as three octal digits | Change permission bits for an account-owned directory or ordinary file. |
 | `archive`, `extract` | `path`, `destination` | ZIP a file or folder, or extract to a new folder. |
+| `archive` with `names` | Folder `path`, `names` (1–500 entry names in that folder), `destination` | ZIP several selected entries into one archive. Each entry keeps its name, folders include their contents, and the shared 64 MiB and 5,000-entry limits apply. The destination cannot be inside a selected folder. |
 | `archive_contents` | ZIP `path`, optional `query`, `offset`, `revision` | List ZIP member file paths and sizes. |
 | `trash`, `trash_list` | Entry `path` for `trash` | Move an entry to private Trash, or list entry IDs and original paths. |
 | `trash_restore`, `trash_purge` | Trash entry `id`, plus unused `destination` for restore | Restore or permanently remove an entry. |

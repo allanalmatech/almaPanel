@@ -514,3 +514,17 @@ remaining behavior and live acceptance before completion.
 - [~] Validate the navigation on the installed Amazon Linux panel after the
   alpha.11 upgrade.
 - [ ] Run screen-reader, Firefox and Safari acceptance.
+
+## Alpha.12 File Manager toolbar implementation and acceptance
+
+- [x] Toolbar layout with scoped search, action and navigation bars, a path
+  box, Collapse All and a sortable listing with types and permissions.
+- [x] Multi-selection with checkboxes, Ctrl/Shift-click and Select All, plus
+  bulk copy, move, delete, permissions and compress.
+- [x] Agent support for multi-entry ZIP archives, with tests for traversal,
+  links, duplicates, nested destinations, limits and cleanup.
+- [x] Empty Trash and Back/Forward history.
+- [ ] Run the multi-entry ZIP and bulk operations on the installed Amazon Linux
+  panel under the account's Linux identity.
+- [ ] Add drag-and-drop moves between folders, a right-click menu and sorting
+  across every page, which requires server-side sorting.

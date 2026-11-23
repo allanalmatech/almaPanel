@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.11",
+    "version": "0.1.0-alpha.12",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -3293,6 +3293,15 @@
                   "member": {
                     "type": "string",
                     "description": "Source path of the file inside the backup ZIP."
+                  },
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "description": "For archive: entry names inside the folder given by path. Each entry is stored under its own name."
                   }
                 },
                 "required": [

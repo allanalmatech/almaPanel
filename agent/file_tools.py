@@ -23,6 +23,7 @@ TRANSFER_BYTES = 256 * 1024 * 1024
 BACKUP_BYTES = 128 * 1024 * 1024
 MAX_ENTRIES = 5000
 MAX_DEPTH = 24
+MAX_ARCHIVE_ITEMS = 500
 ZIP_DIRECTORY_BYTES = 16 * 1024 * 1024
 BACKUP_PAGE_SIZE = 75
 BACKUP_NAME = re.compile(r'(?:website|scheduled)-[a-f0-9]{16}\.zip\Z')
@@ -249,13 +250,15 @@ def zip_entry(archive, parent, relative, info, budget):
         raise ValueError('Archive source contains a symlink or special file.')
 
 
-def write_zip(source, output, max_bytes, *, compress=True, item=None):
+def write_zip(source, output, max_bytes, *, compress=True, item=None, items=None):
     mode = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
     budget = Budget(max_bytes)
+    selected = [item] if item else items
     with zipfile.ZipFile(output, 'w', compression=mode, compresslevel=3) as archive:
-        if item:
-            name, info = item
-            zip_entry(archive, source, [name], info, budget)
+        if selected:
+            # One shared budget covers every selected entry.
+            for name, info in selected:
+                zip_entry(archive, source, [name], info, budget)
         else:
             zip_tree(archive, source, [], budget)
     output.flush()
@@ -282,6 +285,32 @@ def archive_tree(source_root, source_parts, target_root, target_parts, *, privat
                     write_zip(source, output, max_bytes)
         move_entry(target, tmp, target, target_parts[-1])
     return {'message': 'ZIP archive created.', 'name': target_parts[-1]}
+
+
+def archive_items(root, folder_parts, names, target_root, target_parts, *, max_bytes=MAX_BYTES):
+    """Write selected entries from one folder into a new ZIP, keeping each entry's name."""
+    if not isinstance(names, list) or not 1 <= len(names) <= MAX_ARCHIVE_ITEMS:
+        raise ValueError(f'Choose 1 to {MAX_ARCHIVE_ITEMS} items to compress.')
+    for name in names:
+        if not isinstance(name, str) or components(name) != [name]:
+            raise ValueError('Choose items by name inside the current folder.')
+    if len(set(names)) != len(names):
+        raise ValueError('Each item can be selected only once.')
+    if not target_parts or not target_parts[-1].lower().endswith('.zip'):
+        raise ValueError('Choose a new .zip destination.')
+    if source_overlaps(root, target_root, [[*folder_parts, name] for name in names], target_parts):
+        raise ValueError('Save the ZIP outside the selected folders.')
+    with folder(target_root, target_parts[:-1]) as target, staged_output(target) as (tmp, output):
+        with folder(root, folder_parts) as parent:
+            items = [(name, os.stat(name, dir_fd=parent, follow_symlinks=False)) for name in names]
+            write_zip(parent, output, max_bytes, items=items)
+        move_entry(target, tmp, target, target_parts[-1])
+    return {'message': f'ZIP archive created with {len(names)} item{"s" if len(names) != 1 else ""}.',
+            'name': target_parts[-1]}
+
+
+def source_overlaps(source_root, target_root, sources, target_parts):
+    return source_root == target_root and any(source == target_parts[:len(source)] for source in sources)
 
 
 def member_path(info):
