@@ -40,6 +40,33 @@ separate configuration and verification. Configure SPF, DKIM signing and
 DMARC before evaluating public delivery. Automatic DKIM and DMARC management,
 spam filtering, webmail and public delivery acceptance are open items.
 
+## Autoresponders and filters
+
+Autoresponders, Email Filters and Global Email Filters use the Dovecot Sieve
+plugin (`dovecot-pigeonhole` on Amazon Linux, `dovecot-sieve` on Ubuntu).
+Since alpha.17, `enable-mail.sh` installs it and records `"sieve": true` in
+the mail profile when it loaded. If mail was set up with an earlier release,
+re-run the same command with the same hostname, certificate and listener
+option to add it:
+
+```bash
+sudo bash installer/enable-mail.sh mail.example.com FULLCHAIN PRIVKEY [--public|--loopback]
+```
+
+Mail keeps working without the plugin. Those three tools then explain that
+the administrator must re-run the setup.
+
+almaPanel writes one generated `.dovecot.sieve` script per mailbox from
+validated rules; tenants never upload raw Sieve. Each script is compiled with
+`sievec` before the settings are saved. Autoreplies go to each sender at most
+once per chosen interval (1–30 days), and forwarding filters are limited to five
+per mailbox and four redirects per message.
+
+Track Delivery reads the last 72 hours of Postfix messages from the system
+journal and shows only messages to or from the account's mail domains.
+Email Deliverability checks MX, SPF and DMARC with `dig` and suggests records;
+DKIM signing is not configured by almaPanel yet.
+
 ## Use Email Accounts
 
 1. Choose an active hosting account and add its domain under **Domains**.

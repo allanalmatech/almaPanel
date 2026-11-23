@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 
+from agent import mail_rules
 from agent.site_security import password_hash
 from backend.core import domain, name
 
@@ -38,7 +39,8 @@ def profile():
     listen = item['listen']
     if listen not in ('loopback', 'public'):
         raise ValueError('Invalid mail listener setting.')
-    return {'hostname': domain(item['hostname']), 'uid': uid, 'gid': gid, 'listen': listen}
+    return {'hostname': domain(item['hostname']), 'uid': uid, 'gid': gid, 'listen': listen,
+            'sieve': item.get('sieve') is True}
 
 
 def inventory(meta, settings):
@@ -94,6 +96,14 @@ def configuration(data, settings):
             if email.split('@')[1] not in owned or email in recipients:
                 raise ValueError('The root mail registry contains an invalid forwarder.')
             aliases[email] = address(target)
+        for host, target in state.get('defaults', {}).items():
+            if domain(host) not in owned:
+                raise ValueError('The root mail registry contains an invalid default address.')
+            # A domain catch-all also matches real mailboxes, so each keeps an identity entry.
+            for email in recipients:
+                if email.endswith('@' + host):
+                    aliases.setdefault(email, email)
+            aliases['@' + host] = address(target)
     paths = {PASSWD: ''.join(sorted(password_lines))}
     for filename, records in zip(('domains', 'recipients', 'aliases', 'senders'),
                                  (domains, recipients, aliases, senders)):
@@ -148,6 +158,67 @@ def validate_forwarders(data):
             cursor = forwarders[cursor]
 
 
+def validate_default(state, host, target):
+    if target is None:
+        return
+    if target.split('@')[1] in state['domains']:
+        live = {email for email, item in state['mailboxes'].items() if not item.get('retired') and item['enabled']}
+        if target not in live and target not in state['forwarders']:
+            raise ValueError('Send unknown addresses to an active mailbox or forwarder in this account, or to an outside address.')
+
+
+def mail_filters(state):
+    return state.get('global_filters', []), state.get('filters', {}), state.get('autoresponders', {})
+
+
+def scripts(account, state):
+    """Sieve script text for every mailbox (None removes it)."""
+    global_rules, filters, responders = mail_filters(state)
+    result = {}
+    for email, item in state.get('mailboxes', {}).items():
+        active = not item.get('retired')
+        result[email] = mail_rules.script(global_rules, filters.get(email, []), responders.get(email)) if active else None
+    return result
+
+
+def compile_check(contents, run):
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='alma-sieve-') as folder:
+        for index, content in enumerate(item for item in contents if item):
+            source = Path(folder) / f'{index}.sieve'
+            source.write_text(content)
+            run([str(mail_rules.SIEVEC), str(source), str(source.with_suffix('.svbin'))], timeout=15)
+
+
+def prepare_scripts(account, state, settings, run, only=None):
+    """Generate and compile the affected scripts; raise before anything is saved."""
+    planned = scripts(account, state)
+    if only is not None:
+        planned = {email: content for email, content in planned.items() if email in only}
+    if not settings.get('sieve'):
+        if any(planned.values()):
+            raise ValueError('Autoresponders and filters need the mail filter plugin. Ask the server administrator to re-run installer/enable-mail.sh.')
+        return {}
+    compile_check(planned.values(), run)
+    return planned
+
+
+def write_scripts(account, planned, settings):
+    for email, content in planned.items():
+        mail_rules.write_script(account, email, content, settings['uid'], settings['gid'])
+
+
+def tool_state(meta, settings):
+    state = meta.get('mail', {})
+    global_rules, filters, responders = mail_filters(state)
+    return {'available': settings is not None, 'filters_available': bool(settings and settings.get('sieve')),
+            'hostname': settings['hostname'] if settings else None,
+            'domains': sorted(state.get('domains', [])), 'defaults': state.get('defaults', {}),
+            'mailboxes': sorted(email for email, item in state.get('mailboxes', {}).items() if not item.get('retired')),
+            'forwarders': sorted(state.get('forwarders', {})), 'global_filters': global_rules,
+            'filters': filters, 'autoresponders': responders}
+
+
 def configure_domain(meta, state, settings, args):
     host = domain(args.get('domain'))
     enabled = args.get('enabled')
@@ -162,6 +233,7 @@ def configure_domain(meta, state, settings, args):
         active = [email for email, item in state['mailboxes'].items() if not item.get('retired')]
         if any(email.endswith('@' + host) for email in [*active, *state['forwarders']]):
             raise ValueError('Archive the mailboxes and remove the forwarders for this domain first.')
+        state.get('defaults', {}).pop(host, None)
         state['domains'].remove(host)
     return True
 
@@ -200,12 +272,78 @@ def manage(operation, account, data, args, run, atomic, persist):
     settings = profile()
     if operation == 'mail.list':
         return inventory(data[account], settings)
+    if operation == 'mail.rules':
+        return tool_state(data[account], settings)
     if not settings:
         raise ValueError('The server administrator needs to enable managed mail.')
     meta = deepcopy(data[account])
     state = meta.setdefault('mail', {'domains': [], 'mailboxes': {}, 'forwarders': {}})
     updated = {**data, account: meta}
     action = operation.removeprefix('mail.')
+    local = lambda value: address(value)
+    if action == 'usage':
+        return {'mailboxes': [{'address': email, 'quota_mib': item['quota_mib'], 'enabled': item['enabled'],
+                               'bytes': mail_rules.directory_bytes(mail_rules.mailbox_home(account, email) / 'Maildir')}
+                              for email, item in sorted(state['mailboxes'].items()) if not item.get('retired')]}
+    if action == 'track':
+        query = args.get('query') or ''
+        if not isinstance(query, str) or len(query) > 254:
+            raise ValueError('Search for part of an address of up to 254 characters.')
+        identifiers = [item for service in ('smtpd', 'submission/smtpd', 'cleanup', 'qmgr', 'smtp', 'lmtp',
+                                            'error', 'bounce', 'pickup') for item in ('-t', 'postfix/' + service)]
+        output = run(['/usr/bin/journalctl', '--no-pager', '-o', 'short-iso', '--since', '72 hours ago',
+                      '-n', '20000', *identifiers], timeout=20)
+        return {'messages': mail_rules.track(output, state['domains'], query), 'hours': 72}
+    if action == 'deliverability':
+        host = domain(args.get('domain'))
+        if host not in state['domains']:
+            raise ValueError('Choose one of this account’s mail domains.')
+        from agent import dns
+        answers = {'MX': dns.lookup(host, 'MX', run)['answer'], 'TXT': dns.lookup(host, 'TXT', run)['answer'],
+                   'DMARC': dns.lookup('_dmarc.' + host, 'TXT', run)['answer']}
+        return mail_rules.deliverability(host, settings['hostname'], answers)
+    if action in ('autoresponder', 'filters'):
+        if action == 'autoresponder':
+            email = address(args.get('address'))
+            if email not in state['mailboxes'] or state['mailboxes'][email].get('retired'):
+                raise ValueError('Choose an active mailbox in this account.')
+            responders = state.setdefault('autoresponders', {})
+            value = mail_rules.autoresponder(args.get('settings'), email)
+            if value is None:
+                responders.pop(email, None)
+            else:
+                responders[email] = value
+            affected = {email}
+        else:
+            scope = args.get('scope')
+            value = mail_rules.rules(args.get('rules'), local)
+            if scope == 'account':
+                state['global_filters'] = value
+                affected = None
+            else:
+                email = address(scope)
+                if email not in state['mailboxes'] or state['mailboxes'][email].get('retired'):
+                    raise ValueError('Choose an active mailbox in this account.')
+                state.setdefault('filters', {})[email] = value
+                affected = {email}
+        # Compile before saving, so an invalid script never replaces a working one.
+        planned = prepare_scripts(account, state, settings, run, only=affected)
+        persist(updated)
+        write_scripts(account, planned, settings)
+        return {'message': 'Autoresponder saved.' if action == 'autoresponder' else 'Email filters saved.'}
+    if action == 'default':
+        host = domain(args.get('domain'))
+        if host not in state['domains']:
+            raise ValueError('Choose one of this account’s mail domains.')
+        target = mail_rules.default_target(args.get('target'), local)
+        validate_default(state, host, target)
+        defaults = state.setdefault('defaults', {})
+        if target is None:
+            defaults.pop(host, None)
+        else:
+            defaults[host] = target
+        apply(updated, settings, run, atomic, persist)
+        return {'message': 'Default address saved.'}
     if action == 'domain':
         if not configure_domain(meta, state, settings, args):
             return {'message': 'Mail routing is already configured as requested.'}
@@ -225,5 +363,9 @@ def manage(operation, account, data, args, run, atomic, persist):
             del forwarders[email]
         else:
             configure_mailbox(state, email, action, args, run)
+    for host, target in list(state.get('defaults', {}).items()):
+        validate_default(state, host, target)
     apply(updated, settings, run, atomic, persist)
+    if settings.get('sieve') and action in ('retire', 'restore', 'create'):
+        write_scripts(account, prepare_scripts(account, state, settings, run, only={address(args.get('address'))}), settings)
     return {'message': 'Mail configuration saved.'}

@@ -634,6 +634,93 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Save optimization').click()
             page.get_by_text('Applied.', exact=True).wait_for()
             assert option_posts[-1]['values'] == {'compress': True}
+            # Email tools read ?tool= views and post default, autoresponder and filter changes.
+            mail_posts = []
+            mail_state = {'available': True, 'filters_available': True, 'hostname': 'mail.example.com',
+                          'domains': ['example.com'], 'defaults': {}, 'mailboxes': ['me@example.com'],
+                          'forwarders': [], 'global_filters': [], 'filters': {}, 'autoresponders': {}}
+
+            def browser_mail_tools(route):
+                url = route.request.url
+                if route.request.method == 'POST':
+                    body = route.request.post_data_json
+                    mail_posts.append(body)
+                    if body['action'] == 'autoresponder':
+                        if body['settings']:
+                            mail_state['autoresponders'][body['address']] = {**body['settings'], 'address': body['address']}
+                        else:
+                            mail_state['autoresponders'].pop(body['address'], None)
+                    elif body['action'] == 'filters':
+                        if body['scope'] == 'account':
+                            mail_state['global_filters'] = body['rules']
+                        else:
+                            mail_state['filters'][body['scope']] = body['rules']
+                    elif body['action'] == 'default':
+                        mail_state['defaults']['example.com'] = body['target']
+                    route.fulfill(json={'message': 'Mail saved.'})
+                elif 'tool=usage' in url:
+                    route.fulfill(json={'mailboxes': [{'address': 'me@example.com', 'quota_mib': 10, 'enabled': True, 'bytes': 2621440}]})
+                elif 'tool=track' in url:
+                    route.fulfill(json={'hours': 72, 'messages': [{'id': 'A1', 'time': '2026-11-23T11:00:03+0300', 'from': 'me@example.com',
+                        'to': 'bob@far.example', 'relay': 'mx.far.example', 'status': 'bounced', 'detail': '550 User unknown'}]})
+                elif 'tool=deliverability' in url:
+                    assert 'domain=example.com' in url
+                    route.fulfill(json={'domain': 'example.com', 'checks': [
+                        {'name': 'MX', 'state': 'pass', 'found': ['mail.example.com'], 'suggested': '', 'detail': 'MX'},
+                        {'name': 'DMARC', 'state': 'fail', 'found': [], 'suggested': '_dmarc.example.com. TXT "v=DMARC1; p=none"', 'detail': 'DMARC'}]})
+                else:
+                    assert 'tool=rules' in url
+                    route.fulfill(json=mail_state)
+
+            page.route('**/api/accounts/*/mail*', browser_mail_tools)
+            open_tool('default-address')
+            page.get_by_role('radio', name='Deliver it to this address').check()
+            page.get_by_role('textbox', name='Default address for example.com').fill('me@example.com')
+            page.get_by_role('button', name='Save default address').click()
+            page.get_by_text('Mail saved.', exact=True).wait_for()
+            assert mail_posts[-1] == {'action': 'default', 'domain': 'example.com', 'target': 'me@example.com'}
+            open_tool('autoresponders')
+            page.get_by_role('textbox', name='Message').fill('Back on Monday.')
+            page.get_by_role('spinbutton', name='Reply to each sender once every (days)').fill('2')
+            page.get_by_role('button', name='Save autoresponder').click()
+            page.get_by_role('cell', name='Out of office', exact=True).wait_for()
+            assert mail_posts[-1] == {'action': 'autoresponder', 'address': 'me@example.com', 'settings': {
+                'subject': 'Out of office', 'body': 'Back on Monday.', 'interval_days': 2, 'start': '', 'end': ''}}
+            page.get_by_role('button', name='Remove', exact=True).click()
+            page.get_by_role('cell', name='Out of office', exact=True).wait_for(state='hidden')
+            assert mail_posts[-1] == {'action': 'autoresponder', 'address': 'me@example.com', 'settings': None}
+            open_tool('email-filters')
+            page.get_by_role('textbox', name='Filter name').fill('Receipts')
+            page.get_by_role('combobox', name='When').select_option('subject')
+            page.get_by_role('textbox', name='Text').fill('invoice')
+            page.get_by_role('textbox', name='Folder or address').fill('Receipts')
+            page.get_by_role('button', name='Add filter').click()
+            page.get_by_role('cell', name='Subject contains “invoice”', exact=True).wait_for()
+            assert mail_posts[-1] == {'action': 'filters', 'scope': 'me@example.com', 'rules': [{'name': 'Receipts', 'field': 'subject',
+                'match': 'contains', 'value': 'invoice', 'action': 'move', 'target': 'Receipts'}]}
+            open_tool('global-email-filters')
+            page.get_by_role('textbox', name='Filter name').fill('Drop spam')
+            page.get_by_role('combobox', name='When').select_option('from')
+            page.get_by_role('combobox', name='Comparison').select_option('ends')
+            page.get_by_role('textbox', name='Text').fill('@spam.example')
+            page.get_by_role('combobox', name='Action').select_option('discard')
+            page.get_by_role('button', name='Add filter').click()
+            page.get_by_role('cell', name='Discard the message', exact=True).wait_for()
+            assert mail_posts[-1]['scope'] == 'account' and mail_posts[-1]['rules'][0]['target'] is None
+            open_tool('email-disk-usage')
+            page.get_by_role('progressbar', name='me@example.com storage used').wait_for()
+            page.get_by_role('cell', name='2.5 MiB', exact=True).wait_for()
+            open_tool('track-delivery')
+            page.get_by_role('cell', name='bounced', exact=True).wait_for()
+            page.get_by_role('cell', name='550 User unknown', exact=True).wait_for()
+            open_tool('email-deliverability')
+            page.get_by_text('Missing', exact=True).wait_for()
+            page.get_by_text('_dmarc.example.com. TXT "v=DMARC1; p=none"', exact=True).wait_for()
+            mail_state['filters_available'] = False
+            open_tool('autoresponders')
+            page.get_by_text('Ask the server administrator to re-run', exact=False).wait_for()
+            page.unroute('**/api/accounts/*/mail*', browser_mail_tools)
+
             # Familiar names open existing tools, and planned tools open a status page.
             open_tool('ip-blocker')
             page.get_by_role('heading', name='Website Security', exact=True).wait_for()
@@ -646,13 +733,33 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('link',name='Dashboard',exact=True).click()
             page.get_by_role('heading',name='Dashboard',exact=True).wait_for()
             groups = page.locator('.tool-groups .section h2').evaluate_all(
-                'items => items.map(h => h.firstChild.textContent.trim())')
+                'items => items.map(h => h.querySelector(".group-name").textContent.trim())')
             assert groups == ['Hosting Management', 'Email', 'Files', 'Databases', 'Domains', 'Metrics', 'Security',
                               'Software', 'Advanced', 'Preferences', 'Billing & Support', 'Server Administration'], groups
             total = page.locator('.tool').count()
             planned = page.locator('.tool.soon').count()
             assert page.locator('#tool-count').inner_text() == f'{total} tools in 12 groups · {total - planned} available, {planned} planned'
             assert planned > 0 and all('Planned' in text for text in page.locator('.tool.soon').all_inner_texts())
+            # Groups fold; the choice survives a reload, and a search shows matching groups unfolded.
+            email_toggle = page.get_by_role('button', name='Email 16', exact=False).first
+            assert email_toggle.get_attribute('aria-expanded') == 'true'
+            email_toggle.click()
+            assert email_toggle.get_attribute('aria-expanded') == 'false'
+            assert not page.locator('.tool[href="#mail"]').is_visible()
+            page.reload()
+            page.get_by_role('heading', name='Dashboard', exact=True).wait_for()
+            assert page.locator('.section.folded .group-name').evaluate_all('n => n.map(x => x.textContent)') == ['Email']
+            page.locator('#search').fill('autoresponders')
+            page.locator('.tool[href="#autoresponders"]').wait_for()
+            page.locator('#search').fill('')
+            page.locator('.section.folded').wait_for()
+            page.get_by_role('button', name='Collapse all').click()
+            assert page.locator('.section.folded').count() == 12 and page.locator('.tool').first.is_hidden()
+            page.reload()
+            page.get_by_role('heading', name='Dashboard', exact=True).wait_for()
+            assert page.locator('.section.folded').count() == 12
+            page.get_by_role('button', name='Expand all').click()
+            assert page.locator('.section.folded').count() == 0
             page.locator('#search').fill('file manager')
             page.locator('.tool[data-file-manager]').wait_for()
             assert page.locator('.tool').count()==1

@@ -1,7 +1,7 @@
 # Feature matrix
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**Alpha.16 evaluation.** The full requested tool list and its phases are in [docs/ROADMAP.md](docs/ROADMAP.md). Core installation and first-admin setup were verified by
+**Alpha.17 evaluation.** The full requested tool list and its phases are in [docs/ROADMAP.md](docs/ROADMAP.md). Core installation and first-admin setup were verified by
 the operator on Amazon Linux 2023 during alpha.1. The table distinguishes local
 tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 
@@ -17,6 +17,12 @@ tests from acceptance on an installed Ubuntu or Amazon Linux VM.
 | Privileged agent | Foundation | Adapter implemented / partial | Real adapter; not live validated | VM acceptance pending | Ubuntu 24.04 target | UID-checked Unix socket and closed operation list |
 | Frontend shell | Foundation | Implemented locally / partial | Not applicable or control-plane only | Chromium role, search, layout, collapse and mobile-drawer checks | Ubuntu 24.04 / AL2023 | Short role-aware sidebar with searchable dashboard groups; screen-reader and other-browser acceptance pending |
 | Installation framework | Foundation | Partial | Ubuntu and Amazon Linux adapters | Amazon Linux alpha.1 installed by operator | Ubuntu 24.04 / AL2023 | Fresh alpha.3 runs and reboot pending |
+| Default Address | Email | Implemented locally | Postfix catch-all alias with identity entries for real mailboxes; targets validated | Unit and postmap lookup tests | Ubuntu 24.04 / AL2023 | Reject is the default |
+| Autoresponders | Email | Implemented locally | Generated Sieve vacation per mailbox with interval and dates | Real Dovecot delivery: one reply per sender | Ubuntu 24.04 / AL2023 | Needs the Sieve plugin; AL2023 package unverified on EC2 |
+| Email Filters / Global Email Filters | Email | Implemented locally | Generated Sieve: move, forward a copy or discard on From, To, Subject or any | Real Dovecot delivery and hostile-text compile tests | Ubuntu 24.04 / AL2023 | 25 rules, 5 forwards per mailbox |
+| Email Disk Usage | Email | Implemented locally | Mailbox Maildir sizes without following links | Unit tests | Ubuntu 24.04 / AL2023 | No cleanup actions yet |
+| Track Delivery | Email | Implemented locally | Postfix journal, 72 hours, account domains only | Parser tests with sample logs | Ubuntu 24.04 / AL2023 | Journal retention limits history |
+| Email Deliverability | Email | Implemented locally | MX, SPF and DMARC checks with suggested records | Unit tests | Ubuntu 24.04 / AL2023 | DKIM signing planned |
 | Indexes | Advanced | Implemented locally | Per-folder Nginx autoindex; hidden files and scripts keep their deny and PHP rules | Unit tests and a real Nginx server over HTTP | Ubuntu 24.04 / AL2023 | Folder names use letters, digits, - and _ |
 | Error Pages | Advanced | Implemented locally | Nginx error_page for 400–504 to pages inside the website | Real Nginx serves a custom 404 as HTML | Ubuntu 24.04 / AL2023 | Pages must exist in the website |
 | MIME Types | Advanced | Implemented locally | Site types merged with the default list; script extensions refused | Real Nginx content types checked | Ubuntu 24.04 / AL2023 | Up to 50 types per website |

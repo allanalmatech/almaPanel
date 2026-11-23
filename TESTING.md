@@ -87,6 +87,18 @@ the test runs as root, it serves a rendered site with a real Nginx and checks:
 - the custom 404 page served as HTML, and custom MIME types
 - hotlink 403s and redirects, and gzip compression.
 
+Since alpha.17 the browser suite checks group folding, its persistence after a
+reload, and search unfolding matching groups. It also checks every email tool
+screen and the requests it sends.
+
+`tests/test_mail_rules.py` covers rule validation and Sieve quoting, including
+hostile text compiled with `sievec` and inspected with `sieve-dump`. Its
+delivery tests run when Dovecot with Sieve is installed and the test runs as
+root. They deliver real messages with `dovecot-lda` and check filing,
+discarding, forwarded copies and one autoreply per sender. Further tests cover
+the catch-all map with `postmap`, the Postfix log parser and the
+deliverability checks.
+
 No root adapters are simulated. The suite passed on 2026-11-23 with Playwright Chromium 1243. Earlier workspaces could not start Chromium because local socket creation was forbidden. `--no-sandbox` is used only for this isolated test process; no such browser dependency is installed on hosting servers.
 
 ## Actual Linux installation acceptance

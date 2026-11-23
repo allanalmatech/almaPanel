@@ -1126,3 +1126,144 @@ async function siteOptionsView(epoch, section) {
     select.onchange = () => load().catch(error => notice(error.message));
     await load();
 }
+
+// Email tools built on managed mail: default addresses, autoresponders, filters, usage, tracking, deliverability.
+const mailToolPages = {
+    'default-address': ['Default Address', 'Choose what happens to mail sent to addresses that do not exist in a domain.'],
+    autoresponders: ['Autoresponders', 'Send an automatic reply, for example while you are away. Each sender gets at most one reply per interval.'],
+    'email-filters': ['Email Filters', 'Sort, forward or discard incoming mail for one mailbox.'],
+    'global-email-filters': ['Global Email Filters', 'Rules that run first for every mailbox in this account.'],
+    'email-disk-usage': ['Email Disk Usage', 'Storage used by each mailbox compared with its quota.'],
+    'track-delivery': ['Track Delivery', 'Messages sent to or from your mail domains in the last 72 hours.'],
+    'email-deliverability': ['Email Deliverability', 'Check the DNS records that help your mail reach inboxes.']
+};
+
+function filterEditor(rules) {
+    const fields = {from: 'From', to: 'To', subject: 'Subject', any: 'From, To, Cc or Subject'};
+    const matches = {contains: 'contains', is: 'is exactly', begins: 'begins with', ends: 'ends with'};
+    const actions = {move: 'Move to folder', forward: 'Also forward a copy to', discard: 'Discard the message'};
+    return table(['Name', 'Rule', 'Action', ''], rules.map((item, index) => [esc(item.name),
+        esc(`${fields[item.field]} ${matches[item.match]} “${item.value}”`),
+        esc(actions[item.action] + (item.target ? ' ' + item.target : '')),
+        `<button class="subtle" data-remove-rule="${index}">Remove</button>`])) +
+        `<form id="rule-form"><h2>Add a filter</h2>${field('name', 'Filter name', 'text', 'maxlength="60"')}
+        <div class="compact"><label>When<select name="field">${Object.entries(fields).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+        <label>Comparison<select name="match">${Object.entries(matches).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label></div>
+        ${field('value', 'Text', 'text', 'maxlength="200"')}
+        <div class="compact"><label>Action<select name="action">${Object.entries(actions).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+        <label>Folder or address<input name="target" maxlength="254" placeholder="Receipts or someone@example.com"></label></div>
+        <button type="submit">Add filter</button></form>
+        <p class="note">Filters run in order. Move and Discard stop later filters; Forward keeps the message too.</p>`;
+}
+
+async function mailToolsView(epoch, tool) {
+    const base = boundAccount();
+    const path = base + 'mail';
+    const [title, description] = mailToolPages[tool];
+    const data = await api(path + '?tool=rules');
+    if (!activeView(epoch, base)) return;
+    if (!data.available || !data.domains.length) {
+        view(title, description, `<section class="panel"><p>${data.available ? 'Turn on mail for a domain under Email Accounts first.'
+            : 'The server administrator needs to enable managed mail before this tool can be used.'}</p><a href="#mail">Open Email Accounts</a></section>`);
+        return;
+    }
+    const needsFilters = ['autoresponders', 'email-filters', 'global-email-filters'].includes(tool);
+    if (needsFilters && !data.filters_available) {
+        view(title, description, '<section class="panel"><p>Autoresponders and filters need the mail filter plugin. Ask the server administrator to re-run <code>installer/enable-mail.sh</code>.</p></section>');
+        return;
+    }
+    const send = async body => {
+        const result = await api(path, body);
+        notice(result.message);
+        if (activeView(epoch, base)) await route();
+    };
+    const mailboxOptions = data.mailboxes.map(email => `<option>${esc(email)}</option>`).join('');
+    if (tool === 'default-address') {
+        view(title, description, data.domains.map(host => {
+            const target = data.defaults[host] || '';
+            return `<section class="panel"><form class="default-form" data-domain="${esc(host)}"><h2>${esc(host)}</h2>
+                <label class="file-check"><input type="radio" name="mode" value="reject"${target ? '' : ' checked'}> Reject mail for unknown addresses (recommended)</label>
+                <label class="file-check"><input type="radio" name="mode" value="forward"${target ? ' checked' : ''}> Deliver it to this address</label>
+                <input name="target" type="email" maxlength="254" aria-label="Default address for ${esc(host)}" value="${esc(target)}" placeholder="you@${esc(host)}">
+                <button type="submit">Save default address</button></form></section>`;
+        }).join('') + '<p class="note">Delivering unknown addresses attracts spam. Existing mailboxes and forwarders keep working either way.</p>');
+        document.querySelectorAll('.default-form').forEach(element => element.onsubmit = async event => {
+            event.preventDefault();
+            const fields = Object.fromEntries(new FormData(element));
+            try {
+                await send({action: 'default', domain: element.dataset.domain, target: fields.mode === 'forward' ? fields.target.trim() : null});
+            } catch (error) { notice(error.message); }
+        });
+    } else if (tool === 'autoresponders') {
+        const active = Object.values(data.autoresponders);
+        view(title, description, '<section class="panel"><h2>Active autoresponders</h2>' +
+            table(['Mailbox', 'Subject', 'Dates', ''], active.map(item => [esc(item.address), esc(item.subject),
+                esc([item.start || 'Now', item.end || 'until removed'].join(' – ')),
+                `<button class="subtle" data-remove-responder="${esc(item.address)}">Remove</button>`])) + '</section>' +
+            (data.mailboxes.length ? `<section class="panel"><form id="responder-form"><h2>Add or replace an autoresponder</h2>
+                <label>Mailbox<select name="address">${mailboxOptions}</select></label>
+                ${field('subject', 'Subject', 'text', 'maxlength="120" value="Out of office"')}
+                <label>Message<textarea name="body" rows="6" maxlength="4000" required></textarea></label>
+                <div class="compact">${field('interval', 'Reply to each sender once every (days)', 'number', 'min="1" max="30" value="1"')}<span></span>
+                <label>Start date (optional)<input name="start" type="date"></label><label>End date (optional)<input name="end" type="date"></label></div>
+                <button type="submit">Save autoresponder</button></form></section>` : '<section class="panel"><p>Create a mailbox first.</p></section>'));
+        if (data.mailboxes.length) form('#responder-form', async fields => send({action: 'autoresponder', address: fields.address, settings: {
+            subject: fields.subject, body: fields.body, interval_days: Number(fields.interval), start: fields.start, end: fields.end}}));
+        actionHandler($('#main'), '[data-remove-responder]', async button =>
+            send({action: 'autoresponder', address: button.dataset.removeResponder, settings: null}));
+    } else if (tool === 'email-filters' || tool === 'global-email-filters') {
+        const global = tool === 'global-email-filters';
+        if (!global && !data.mailboxes.length) {
+            view(title, description, '<section class="panel"><p>Create a mailbox first.</p></section>');
+            return;
+        }
+        const chosen = global ? 'account' : (sessionStorage.getItem('alma-filter-mailbox') || data.mailboxes[0]);
+        const scope = global || data.mailboxes.includes(chosen) ? chosen : data.mailboxes[0];
+        const rules = global ? data.global_filters : (data.filters[scope] || []);
+        view(title, description, '<section class="panel">' + (global ? '' :
+            `<label>Mailbox<select id="filter-mailbox">${mailboxOptions}</select></label>`) +
+            `<h2>${global ? 'Account-wide filters' : 'Filters for this mailbox'}</h2>` + filterEditor(rules) + '</section>');
+        if (!global) {
+            $('#filter-mailbox').value = scope;
+            $('#filter-mailbox').onchange = event => { sessionStorage.setItem('alma-filter-mailbox', event.target.value); route(); };
+        }
+        const save = next => send({action: 'filters', scope, rules: next});
+        form('#rule-form', async fields => save([...rules, {name: fields.name, field: fields.field, match: fields.match,
+            value: fields.value, action: fields.action, target: fields.action === 'discard' ? null : fields.target.trim()}]));
+        actionHandler($('#main'), '[data-remove-rule]', async button =>
+            save(rules.filter((_, index) => index !== Number(button.dataset.removeRule))));
+    } else if (tool === 'email-disk-usage') {
+        const usage = await api(path + '?tool=usage');
+        if (!activeView(epoch, base)) return;
+        view(title, description, '<section class="panel">' + table(['Mailbox', 'Used', 'Quota', ''], usage.mailboxes.map(item => {
+            const quota = item.quota_mib * 1048576;
+            return [esc(item.address), esc(fileSize(item.bytes)), esc(item.quota_mib + ' MiB'),
+                `<progress max="${quota}" value="${Math.min(item.bytes, quota)}" aria-label="${esc(item.address)} storage used"></progress>`];
+        })) + '<p class="note">Sizes are measured from the mail store now. Change quotas under Email Accounts.</p></section>');
+    } else if (tool === 'track-delivery') {
+        const query = sessionStorage.getItem('alma-track-query') || '';
+        const result = await api(path + '?tool=track&query=' + encodeURIComponent(query));
+        if (!activeView(epoch, base)) return;
+        view(title, description, `<section class="panel"><form id="track-form" class="toolbar"><input name="query" type="search" maxlength="254"
+            aria-label="Address contains" placeholder="Address contains…" value="${esc(query)}"><button type="submit">Search</button></form>` +
+            table(['Time', 'From', 'To', 'Status', 'Details'], result.messages.map(item => [esc(item.time.replace('T', ' ').slice(0, 19)),
+                esc(item.from || '—'), esc(item.to), `<span class="badge status-${esc(item.status)}">${esc(item.status)}</span>`,
+                esc(item.detail || item.relay)])) + `<p class="note">Showing up to 200 deliveries from the last ${result.hours} hours.</p></section>`);
+        form('#track-form', async fields => { sessionStorage.setItem('alma-track-query', fields.query.trim()); await route(); });
+    } else {
+        const chosen = sessionStorage.getItem('alma-deliverability-domain');
+        const host = data.domains.includes(chosen) ? chosen : data.domains[0];
+        const report = await api(path + '?tool=deliverability&domain=' + encodeURIComponent(host));
+        if (!activeView(epoch, base)) return;
+        const states = {pass: 'Valid', warn: 'Needs attention', fail: 'Missing', info: 'Planned'};
+        view(title, description, `<section class="panel"><label>Domain<select id="deliverability-domain">${data.domains.map(item =>
+            `<option>${esc(item)}</option>`).join('')}</select></label>` +
+            table(['Record', 'Status', 'Found', 'Suggested record'], report.checks.map(item => [esc(item.name),
+                `<span class="badge status-${esc(item.state)}">${esc(states[item.state])}</span>`,
+                item.found.length ? item.found.map(value => `<code>${esc(value)}</code>`).join('<br>') : '—',
+                (item.suggested ? `<code>${esc(item.suggested)}</code><br>` : '') + `<small>${esc(item.detail)}</small>`])) +
+            '<p class="note">Add or change these records where your domain’s DNS is hosted. Changes can take time to appear.</p></section>');
+        $('#deliverability-domain').value = host;
+        $('#deliverability-domain').onchange = event => { sessionStorage.setItem('alma-deliverability-domain', event.target.value); route(); };
+    }
+}

@@ -554,10 +554,20 @@ The full list, phases and requirements are in docs/ROADMAP.md.
 
 - [x] Regroup the dashboard to list every requested tool, with Planned badges.
 - [x] Indexes, Error Pages, MIME Types, Hotlink Protection and Optimize Website.
-- [ ] Phase A – email tools (default address, autoresponders, filters, disk usage,
-  delivery tracking, deliverability and DKIM, spam and greylisting, routing, importer).
+- [~] Phase A – email tools. Done in alpha.17: default address, autoresponders,
+  filters, disk usage, delivery tracking and deliverability checks. Open: DKIM
+  signing, spam filtering and greylisting, routing and the address importer.
 - [ ] Phase B – FTP, Web Disk, wizards, private Git, remote database access, database manager.
 - [ ] Phase C – PHP versions, Node.js and Python apps, app installer, packages, SSH, mailing lists.
 - [ ] Phase D – tenant zone editor, dynamic DNS, publisher, builder, visitor and resource metrics.
 - [ ] Phase E – ModSecurity, malware scanning, leech protection, mail encryption, languages, billing.
 - [ ] Validate the alpha.16 website options on the installed Amazon Linux panel.
+
+## Alpha.17 foldable dashboard and email tools
+
+- [x] Foldable dashboard groups with remembered state.
+- [x] Default Address, Autoresponders, Email Filters, Global Email Filters, Email
+  Disk Usage, Track Delivery and Email Deliverability.
+- [ ] Re-run enable-mail.sh on Amazon Linux to confirm the dovecot-pigeonhole
+  package, then test an autoreply and a filter end to end.
+- [ ] DKIM signing, spam filtering and greylisting, Email Routing and Address Importer.

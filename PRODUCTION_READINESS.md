@@ -1,7 +1,7 @@
 # Production readiness report
 Copyright © 2026 Alma Tech Labs Inc. · LicenseRef-AlmaTech-Pending
 
-**0.1.0-alpha.16 · 2026-11-23 · Evaluation.** Production release gates remain open.
+**0.1.0-alpha.17 · 2026-11-23 · Evaluation.** Production release gates remain open.
 
 | Area | Verified evidence | Open acceptance |
 | --- | --- | --- |

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "almaPanel API",
-    "version": "0.1.0-alpha.16",
+    "version": "0.1.0-alpha.17",
     "description": "Copyright 2026 Alma Tech Labs Inc. Hosting evaluation for Ubuntu 24.04 and Amazon Linux 2023.",
     "contact": {
       "name": "Alma Tech Labs Inc.",
@@ -5348,6 +5348,37 @@
               "type": "integer",
               "minimum": 1
             }
+          },
+          {
+            "name": "tool",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "rules",
+                "usage",
+                "track",
+                "deliverability"
+              ]
+            },
+            "description": "Omit for the mailbox list. rules: defaults, filters and autoresponders; usage: mailbox sizes; track: last 72 hours of deliveries; deliverability: MX, SPF and DMARC checks."
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 254
+            }
           }
         ],
         "responses": {
@@ -5411,7 +5442,10 @@
                       "retire",
                       "restore",
                       "forward",
-                      "unforward"
+                      "unforward",
+                      "default",
+                      "autoresponder",
+                      "filters"
                     ]
                   },
                   "domain": {
@@ -5422,8 +5456,11 @@
                     "format": "email"
                   },
                   "target": {
-                    "type": "string",
-                    "format": "email"
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Forwarder target, or for default the address that receives unknown addresses (null rejects them)."
                   },
                   "password": {
                     "type": "string",
@@ -5440,6 +5477,61 @@
                   },
                   "confirm": {
                     "type": "string"
+                  },
+                  "settings": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "Autoresponder: subject, body, interval_days (1-30), optional start and end dates (YYYY-MM-DD). null removes it."
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Filters: a mailbox address, or \"account\" for global filters."
+                  },
+                  "rules": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "field": {
+                          "enum": [
+                            "from",
+                            "to",
+                            "subject",
+                            "any"
+                          ]
+                        },
+                        "match": {
+                          "enum": [
+                            "contains",
+                            "is",
+                            "begins",
+                            "ends"
+                          ]
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "enum": [
+                            "move",
+                            "discard",
+                            "forward"
+                          ]
+                        },
+                        "target": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
                   }
                 },
                 "required": [

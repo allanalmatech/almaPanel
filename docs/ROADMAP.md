@@ -19,12 +19,12 @@ tool under a familiar name), **Planned** (phase in brackets), **Not applicable**
 |---|---|---|
 | Email Accounts | Available | Optional Postfix and Dovecot setup |
 | Forwarders | Alias → Email Accounts | — |
-| Default Address | Planned (A) | Postfix catch-all map per domain |
-| Autoresponders | Planned (A) | Dovecot Sieve (Pigeonhole) vacation rules |
-| Email Filters, Global Email Filters | Planned (A) | Dovecot Sieve scripts per mailbox and per account |
-| Email Disk Usage | Planned (A) | Per-mailbox Maildir size and cleanup actions |
-| Track Delivery | Planned (A) | Account-scoped search of Postfix logs |
-| Email Deliverability | Planned (A) | SPF, DKIM and DMARC checks; DKIM signing service |
+| Default Address | Available (alpha.17) | — |
+| Autoresponders | Available (alpha.17) | Mail filter plugin from `enable-mail.sh` |
+| Email Filters, Global Email Filters | Available (alpha.17) | Mail filter plugin from `enable-mail.sh` |
+| Email Disk Usage | Available (alpha.17) | Cleanup actions planned |
+| Track Delivery | Available (alpha.17) | — |
+| Email Deliverability | Available (alpha.17) | DKIM signing service planned (A) |
 | Spam Filters, Configure Greylisting | Planned (A) | A spam filter service (for example rspamd) with per-account settings |
 | Email Routing | Planned (A) | Local or remote delivery per domain in Postfix transport maps |
 | Address Importer | Planned (A) | CSV import that reuses mailbox and forwarder validation |
@@ -122,8 +122,9 @@ tool under a familiar name), **Planned** (phase in brackets), **Not applicable**
 
 ## Phases
 
-- **A – Email:** default address, autoresponders, filters, disk usage, delivery
-  tracking, deliverability and DKIM, spam filtering and greylisting, routing, importer.
+- **A – Email:** done in alpha.17: default address, autoresponders, filters, disk
+  usage, delivery tracking, deliverability checks. Remaining: DKIM signing, spam
+  filtering and greylisting, routing, importer.
 - **B – Files and databases:** FTP accounts, Web Disk, backup and database wizards,
   private Git, remote database access and a web database manager.
 - **C – Runtimes:** PHP versions, Node.js and Python apps, application manager,

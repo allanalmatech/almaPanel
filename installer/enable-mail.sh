@@ -118,6 +118,17 @@ if ((!configured)); then
   DEBIAN_FRONTEND=noninteractive apt-get install -y postfix dovecot-core dovecot-imapd dovecot-lmtpd
  fi
 fi
+# Autoresponders and filters use the Dovecot Sieve plugin. Mail keeps working without it.
+sieve=false
+if [[ $ID == amzn ]]; then
+ dnf install -y dovecot-pigeonhole || echo 'Dovecot Sieve plugin unavailable; autoresponders and filters stay off.' >&2
+else
+ DEBIAN_FRONTEND=noninteractive apt-get install -y dovecot-sieve || echo 'Dovecot Sieve plugin unavailable; autoresponders and filters stay off.' >&2
+fi
+for plugin in /usr/lib64/dovecot/lib90_sieve_plugin.so /usr/lib/dovecot/modules/lib90_sieve_plugin.so; do
+ [[ -f $plugin ]] && sieve=true
+done
+[[ $sieve == true && -x /usr/bin/sievec ]] || sieve=false
 if ! getent passwd almapanel-mail >/dev/null; then
  useradd --system --user-group --no-create-home --home-dir /var/vmail --shell /usr/sbin/nologin almapanel-mail
 fi
@@ -154,6 +165,9 @@ while IFS= read -r setting; do
 done < "$ROOT/services/mail/postfix-submission.conf"
 sed -e "s/@UID@/$mail_uid/g" -e "s/@GID@/$mail_gid/g" -e "s/@LISTEN@/$imap_listen/g" \
  "$ROOT/services/mail/dovecot-alma.conf" > "$stage/dovecot.conf"
+if [[ $sieve == true ]]; then
+ cat "$ROOT/services/mail/dovecot-sieve.conf" >> "$stage/dovecot.conf"
+fi
 changed=1
 install -m 644 "$stage/fullchain.pem" "$state/fullchain.pem"
 install -m 600 "$stage/private.pem" "$state/private.pem"
@@ -181,7 +195,7 @@ for port in 25 587 993; do
  fi
 done
 systemctl enable dovecot.service postfix.service
-printf '{"hostname":"%s","uid":%s,"gid":%s,"listen":"%s"}\n' "$hostname" "$mail_uid" "$mail_gid" "$listen" > "$stage/profile.json"
+printf '{"hostname":"%s","uid":%s,"gid":%s,"listen":"%s","sieve":%s}\n' "$hostname" "$mail_uid" "$mail_gid" "$listen" "$sieve" > "$stage/profile.json"
 mv -- "$stage/profile.json" "$state/profile.json"
 rm -f -- "$state/installing"
 echo "Mail services listening on $imap_listen on TCP 25, 587 and 993 for $hostname. See docs/MAIL.md to test delivery."

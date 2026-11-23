@@ -281,11 +281,30 @@ def sftp(db, user, account, method, body, ip):
     return result
 
 
-def mail(db, user, account, method, body, ip):
+MAIL_VIEWS = {'rules', 'usage', 'track', 'deliverability'}
+
+
+def mail(db, user, account, method, body, ip, env=None):
     if method == 'GET':
-        return c.rpc('mail.list', name=account['name'])
+        query = parse_qs((env or {}).get('QUERY_STRING', ''))
+        tool = query.get('tool', [''])[0]
+        if not tool:
+            return c.rpc('mail.list', name=account['name'])
+        if tool not in MAIL_VIEWS:
+            raise c.Problem('Choose a supported mail view.')
+        return c.rpc(f'mail.{tool}', name=account['name'], domain=query.get('domain', [None])[0],
+                     query=query.get('query', [''])[0])
     action = allowed(body, {'domain', 'create', 'password', 'quota', 'state', 'retire', 'restore',
-                            'forward', 'unforward'})
+                            'forward', 'unforward', 'default', 'autoresponder', 'filters'})
+    if action in ('default', 'autoresponder', 'filters'):
+        if action == 'default':
+            host = c.domain(body.get('domain'))
+            find_domain(db, account, host)
+        result = c.rpc(f'mail.{action}', name=account['name'], domain=body.get('domain'), address=body.get('address'),
+                       target=body.get('target'), settings=body.get('settings'), scope=body.get('scope'),
+                       rules=body.get('rules'))
+        c.audit(db, user['id'], f'mail.{action}', account['id'], ip)
+        return result
     if action == 'domain':
         host = c.domain(body.get('domain'))
         find_domain(db, account, host)

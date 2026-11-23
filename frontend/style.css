@@ -240,3 +240,26 @@ kbd{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(-
 .tool.soon{color:var(--muted)}
 .tool.soon svg{color:var(--muted);opacity:.7}
 .tool .badge{margin-left:6px;font-style:normal;font-size:9px;padding:1px 5px;vertical-align:1px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+
+/* Foldable dashboard groups. */
+.tool-groups .section h2{padding:0}
+.group-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:13px 18px;background:transparent;color:var(--ink);
+    border:0;border-radius:6px 6px 0 0;font:inherit;font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;text-align:left}
+.group-toggle:hover{background:var(--bg);filter:none}
+.group-toggle .group-name{margin-right:auto}
+.group-toggle .chevron{width:16px;height:16px;color:var(--muted);transition:transform .15s ease}
+.section.folded .group-toggle .chevron{transform:rotate(-90deg)}
+.section.folded h2{border-bottom:0}
+.section.folded .group-toggle{border-radius:6px}
+.fold-all{display:flex;gap:6px;margin-left:auto}
+@media(prefers-reduced-motion:reduce){.group-toggle .chevron{transition:none}}
+
+/* Email tool status badges. */
+.badge.status-sent,.badge.status-pass{background:#e3f4e8;color:#1d6b35}
+.badge.status-bounced,.badge.status-fail{background:#fbe5e5;color:#9b2525}
+.badge.status-deferred,.badge.status-warn{background:#fdf0d9;color:#8a5a00}
+.badge.status-info,.badge.status-unknown{background:var(--bg);color:var(--muted)}
+.dark .badge.status-sent,.dark .badge.status-pass{background:#1d4a2c;color:#a8e2b8}
+.dark .badge.status-bounced,.dark .badge.status-fail{background:#4d2222;color:#f3b4b4}
+.dark .badge.status-deferred,.dark .badge.status-warn{background:#4a3a14;color:#f3d48f}
+.default-form input[name=target]{max-width:420px}

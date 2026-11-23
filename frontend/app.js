@@ -29,13 +29,13 @@ const SOON=true;
 const catalog=[
     {label:'Hosting Management',roles:MANAGERS,tools:[['Hosting Accounts','accounts',7,'Create, suspend and retry hosting accounts'],['Hosting Packages','packages',15,'Enforce domain-count allocations']]},
     {label:'Email',tools:[['Email Accounts','mail',10,'Create mailboxes, passwords and quotas'],['Forwarders','forwarders',10,'Forward addresses to other mailboxes'],
-        ['Email Routing','soon-email-routing',10,'Choose local or remote mail delivery for a domain',SOON],['Autoresponders','soon-autoresponders',10,'Send automatic replies while away',SOON],
-        ['Default Address','soon-default-address',10,'Catch mail sent to unknown addresses',SOON],['Mailing Lists','soon-mailing-lists',7,'Run discussion and announcement lists',SOON],
-        ['Track Delivery','soon-track-delivery',4,'Follow messages through the mail server',SOON],['Global Email Filters','soon-global-email-filters',11,'Filter mail for every address in the account',SOON],
-        ['Email Filters','soon-email-filters',11,'Sort or discard mail for one address',SOON],['Email Deliverability','soon-email-deliverability',11,'Check SPF, DKIM and DMARC records',SOON],
+        ['Email Routing','soon-email-routing',10,'Choose local or remote mail delivery for a domain',SOON],['Autoresponders','autoresponders',10,'Send automatic replies while away'],
+        ['Default Address','default-address',10,'Catch mail sent to unknown addresses'],['Mailing Lists','soon-mailing-lists',7,'Run discussion and announcement lists',SOON],
+        ['Track Delivery','track-delivery',4,'Follow messages through the mail server'],['Global Email Filters','global-email-filters',11,'Filter mail for every address in the account'],
+        ['Email Filters','email-filters',11,'Sort or discard mail for one address'],['Email Deliverability','email-deliverability',11,'Check MX, SPF and DMARC records'],
         ['Address Importer','soon-address-importer',8,'Create many addresses or forwarders from a file',SOON],['Spam Filters','soon-spam-filters',11,'Score and filter unwanted mail',SOON],
         ['Encryption','soon-encryption',3,'Manage keys for encrypted mail',SOON],['Challenge-Response Filter','soon-challenge-response',11,'Hold mail from unknown senders until they confirm',SOON],
-        ['Configure Greylisting','soon-greylisting',14,'Delay first-time senders to reduce spam',SOON],['Email Disk Usage','soon-email-disk-usage',4,'See and clean up mailbox storage',SOON]]},
+        ['Configure Greylisting','soon-greylisting',14,'Delay first-time senders to reduce spam',SOON],['Email Disk Usage','email-disk-usage',4,'See storage used by each mailbox']]},
     {label:'Files',tools:[['File Manager','files',0,'Browse, upload and edit website files'],['Images','files',0,'Resize and convert pictures from the file list'],
         ['Directory Privacy','directory-privacy',3,'Password-protect website folders'],['Disk Usage','usage',4,'Measure actual account storage'],
         ['Website Backups','backups',0,'Back up and restore website files'],['Trash','trash',0,'Recover files and folders'],['SFTP Access','sftp',3,'Manage keys for file transfer'],
@@ -96,14 +96,32 @@ function dashboard(){
     const matches=shown.reduce((n,g)=>n+g.tools.length,0);
     const planned=groupsForRole.reduce((n,g)=>n+g.tools.filter(t=>t[4]).length,0);
     const summary=terms.length?`${matches} of ${total} tools match “${esc(raw)}”`:`${total} tools in ${groupsForRole.length} groups · ${total-planned} available, ${planned} planned`;
+    // Folded groups are remembered per browser; a search shows every group with matches unfolded.
+    const folded=terms.length?new Set():foldedGroups();
     // Large groups span a row. The last small group stretches over any empty columns left in its row.
     const narrow=shown.filter(g=>g.tools.length<4),lastNarrow=narrow[narrow.length-1],fill=lastNarrow?[narrow.length%2?' fill-2':'',narrow.length%3===1?' fill-3':narrow.length%3===2?' fill-3-half':''].join(''):'';
-    const body=shown.length?`<div class="tool-groups">${shown.map((g,n)=>`<section class="section${g.tools.length>=4?' wide':g===lastNarrow?fill:''}" aria-labelledby="group-${n}"><h2 id="group-${n}">${esc(g.label)}<span class="count">${g.tools.length}</span></h2><div class="tool-grid">${g.tools.map(([title,href,i,help,soon])=>`<a class="tool${soon?' soon':''}" href="#${href}"${href==='files'?' data-file-manager':''}>${icon(i)}<span>${esc(title)}${soon?'<em class="badge">Planned</em>':''}<small>${esc(help)}</small></span></a>`).join('')}</div></section>`).join('')}</div>`
+    const chevron='<svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M4 6l4 4 4-4"/></svg>';
+    const body=shown.length?`<div class="tool-groups">${shown.map((g,n)=>{const closed=folded.has(g.label);return `<section class="section${g.tools.length>=4?' wide':g===lastNarrow?fill:''}${closed?' folded':''}" aria-labelledby="group-${n}"><h2 id="group-${n}"><button type="button" class="group-toggle" data-group="${esc(g.label)}" aria-expanded="${!closed}" aria-controls="group-body-${n}"><span class="group-name">${esc(g.label)}</span><span class="count">${g.tools.length}</span>${chevron}</button></h2><div class="tool-grid" id="group-body-${n}"${closed?' hidden':''}>${g.tools.map(([title,href,i,help,soon])=>`<a class="tool${soon?' soon':''}" href="#${href}"${href==='files'?' data-file-manager':''}>${icon(i)}<span>${esc(title)}${soon?'<em class="badge">Planned</em>':''}<small>${esc(help)}</small></span></a>`).join('')}</div></section>`;}).join('')}</div>`
         :`<section class="panel empty-state"><h2>No tools match “${esc(raw)}”</h2><p>Try a tool name, a task such as “backup”, or a category such as “Email”.</p><button id="clear-search" type="button">Clear search</button></section>`;
-    view('Dashboard','Manage your websites and hosting resources. Search or choose a tool below.',`<div class="toolbar dashboard-bar"><p id="tool-count" role="status">${summary}</p>${terms.length&&shown.length?'<button id="clear-search" type="button" class="subtle">Clear search</button>':''}</div>${body}<p class="note">See Feature Availability under Help for the tools and requirements of this evaluation release.</p>`);
+    const foldButtons=terms.length||!shown.length?'':'<span class="fold-all"><button type="button" class="subtle" data-fold-all="open">Expand all</button><button type="button" class="subtle" data-fold-all="close">Collapse all</button></span>';
+    view('Dashboard','Manage your websites and hosting resources. Search or choose a tool below.',`<div class="toolbar dashboard-bar"><p id="tool-count" role="status">${summary}</p>${terms.length&&shown.length?'<button id="clear-search" type="button" class="subtle">Clear search</button>':''}${foldButtons}</div>${body}<p class="note">Tools marked Planned are on the roadmap. Feature Availability under Billing &amp; Support lists what this release includes.</p>`);
     syncFileManagerLinks();
+    const setFolded=(section,closed)=>{section.classList.toggle('folded',closed);section.querySelector('.tool-grid').hidden=closed;section.querySelector('.group-toggle').setAttribute('aria-expanded',String(!closed));};
+    $('#main').querySelectorAll('.group-toggle').forEach(button=>button.onclick=()=>{
+        const section=button.closest('.section'),closed=!section.classList.contains('folded');
+        setFolded(section,closed);
+        if(!terms.length){const stored=foldedGroups();closed?stored.add(button.dataset.group):stored.delete(button.dataset.group);saveFolded(stored);}
+    });
+    $('#main').querySelectorAll('[data-fold-all]').forEach(button=>button.onclick=()=>{
+        const closed=button.dataset.foldAll==='close';
+        $('#main').querySelectorAll('.tool-groups .section').forEach(section=>setFolded(section,closed));
+        saveFolded(closed?new Set(shown.map(g=>g.label)):new Set());
+    });
     const clear=$('#clear-search');if(clear)clear.onclick=()=>{$('#search').value='';dashboard();$('#search').focus();};
 }
+const FOLD_KEY='alma-folded-groups';
+function foldedGroups(){try{return new Set(JSON.parse(localStorage.getItem(FOLD_KEY)||'[]'));}catch{return new Set();}}
+function saveFolded(groups){try{localStorage.setItem(FOLD_KEY,JSON.stringify([...groups]));}catch{/* Per-browser preference only. */}}
 function breadcrumb(page){
     const tool=page==='dashboard'?null:findTool(page),title=page==='dashboard'?'Dashboard':tool?.title||'Page unavailable';
     const parts=[`<li><a href="#dashboard">Home</a></li>`];if(tool)parts.push(`<li>${esc(tool.group)}</li>`);parts.push(`<li aria-current="page">${esc(title)}</li>`);
@@ -131,6 +149,7 @@ if(standalone){const id=Number(params.get('account')),target=accounts.find(a=>a.
 if(page==='filemanager'){if(params.has('path'))currentPath=params.get('path');await fileManagerView(epoch);}else await fileEditorPage(epoch,params);return;}
 if(page==='dashboard'){dashboard();return;}
 if(page.startsWith('soon-')){const tool=findTool(requested);if(!tool)throw Error('Tool not found.');const entry=catalog.flatMap(g=>g.tools).find(t=>t[1]===requested);view(tool.title,entry[3],`<section class="panel"><p><span class="badge">Planned</span> This tool is not available in this release yet.</p><p>It is on the almaPanel roadmap in the ${esc(tool.group)} group. Feature Availability lists what each release includes.</p><a href="#availability">Open Feature Availability</a> · <a href="#dashboard">Back to the dashboard</a></section>`);return;}
+if(['default-address','autoresponders','email-filters','global-email-filters','email-disk-usage','track-delivery','email-deliverability'].includes(page)){await mailToolsView(epoch,page);return;}
 if(page==='indexes'||page==='error-pages'||page==='mime-types'||page==='hotlink'||page==='optimize'){await siteOptionsView(epoch,{'indexes':'indexes','error-pages':'error_pages','mime-types':'mime','hotlink':'hotlink','optimize':'optimize'}[page]);return;}
 if(page==='about'){view('About almaPanel','Powerful Hosting. Simple Management.',`<section class="panel"><h2>Developed and owned by Alma Tech Labs Inc.</h2><p>Linux hosting control panel · Linux edition</p><p><a href="https://almatechconsults.com">almatechconsults.com</a><br><a href="mailto:almatechuganda@gmail.com">almatechuganda@gmail.com</a><br><a href="tel:+256700868939">+256 700 868 939</a></p><p>Original branding, artwork and implementation. Not affiliated with cPanel.</p><p>Licensing is pending owner approval. © 2026 Alma Tech Labs Inc. All Rights Reserved.</p></section>`);return;}
 if(page==='availability'){

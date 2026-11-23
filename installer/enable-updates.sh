@@ -71,7 +71,7 @@ if [[ $SOURCE != /opt/almapanel ]]; then
  install -m 644 "$SOURCE/services/sftp/sshd_config" /opt/almapanel/services/sftp/
  install -m 644 "$SOURCE/services/systemd/almapanel-sftp.service" /opt/almapanel/services/systemd/
  install -m 644 "$SOURCE"/services/systemd/almapanel-offsite-backup.{timer,service} /opt/almapanel/services/systemd/
- install -m 644 "$SOURCE/services/mail/"{dovecot-alma,postfix-main,postfix-submission}.conf /opt/almapanel/services/mail/
+ install -m 644 "$SOURCE/services/mail/"{dovecot-alma,dovecot-sieve,postfix-main,postfix-submission}.conf /opt/almapanel/services/mail/
  install -m 644 "$SOURCE/docs/"{HOSTING,MAIL,UPDATES,BACKUPS}.md /opt/almapanel/docs/
 fi
 sed "s@^ExecStart=/usr/bin/python3 @ExecStart=$PANEL_PY @" \

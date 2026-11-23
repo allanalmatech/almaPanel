@@ -250,7 +250,7 @@ def api(env, body, db, headers):
         if action == 'files':
             return hosting.files(db, user, account, method, env, body, ip)
         if action == 'mail':
-            return hosting.mail(db, user, account, method, body, ip)
+            return hosting.mail(db, user, account, method, body, ip, env)
         if action == 'sftp':
             return hosting.sftp(db, user, account, method, body, ip)
         if action == 'site-security':

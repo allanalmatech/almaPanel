@@ -362,3 +362,32 @@ exactly as before.
 - The Chromium suite passed the regrouped dashboard, alias tiles, planned
   status page and the five new tool screens.
 - Installed Amazon Linux acceptance is pending.
+
+## 2026-11-23 · 0.1.0-alpha.17
+
+The owner asked for foldable dashboard groups and to start the remaining tools.
+Group headings are now fold buttons with remembered state, Expand all and
+Collapse all. A search shows matching groups unfolded without changing the
+saved state.
+
+Phase A email work added seven tools on the existing Postfix and Dovecot
+setup, mostly in `agent/mail_rules.py`:
+- Default Address: a Postfix catch-all with identity entries, so real
+  mailboxes still receive their mail.
+- Autoresponders, Email Filters and Global Email Filters: one generated
+  Sieve script per mailbox. It is built from validated rules, compiled with
+  `sievec` before the settings are saved, and written without following
+  links in the mail store.
+- Email Disk Usage.
+- Track Delivery: journal-based and scoped to the account's domains.
+- Email Deliverability: MX, SPF and DMARC checks with suggested records.
+
+`enable-mail.sh` now installs the Sieve plugin and records it in the mail
+profile. Existing servers re-run it.
+
+- `make check` passed. New tests deliver real mail with Dovecot 2.3.21 and
+  check filing, discarding, forwarded copies and one autoreply per sender.
+  Hostile filter text compiles into no extra Sieve commands.
+- The Chromium suite passed the fold controls and every new email screen.
+- Open: confirm the AL2023 Sieve package on EC2, DKIM signing, spam filtering,
+  greylisting, routing and the importer.

@@ -80,6 +80,18 @@ Unimplemented requested modules are tracked in FEATURE_MATRIX.md; no claim of pr
 - Return structured agent errors and log Linux account-creation failures.
 - Add an authorized retry for a failed or interrupted hosting-account setup.
 
+## 0.1.0-alpha.17
+
+- Make dashboard groups foldable. Folded groups are remembered per browser,
+  Expand all and Collapse all are available, and a search unfolds matching groups.
+- Email (phase A): Default Address, Autoresponders, Email Filters, Global Email
+  Filters, Email Disk Usage, Track Delivery and Email Deliverability.
+- Autoresponders and filters write one generated, compiled Sieve script per
+  mailbox. `enable-mail.sh` now installs the Dovecot Sieve plugin; re-run it on
+  existing mail servers to enable these tools.
+- Add `?tool=rules|usage|track|deliverability` views and `default`,
+  `autoresponder` and `filters` actions to `/accounts/{id}/mail`.
+
 ## 0.1.0-alpha.16
 
 - Reorganize the dashboard into Email, Files, Databases, Domains, Metrics,
